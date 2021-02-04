@@ -40,6 +40,9 @@ pub(crate) fn create(
             // set up a spot on the stack where the event handler will always be
             // double indirection here is used so we have a single-wide pointer no matter what
             // In order to keep santicity of data, a RefCell is used to lock down access
+            // Note: since this is single threaded, we could, in theory, replace this with an UnsafeCell
+            //       and just pass along the pointer to cut out the overhead of RefCell. I'll try this once
+            //       this crate is in a good enough place to run benchmarks.
             let window_data = RefCell::new(WindowData {
                 event_handler: Box::new(|ev| {
                     log::warn!("Event ignored: {:?}", ev);
