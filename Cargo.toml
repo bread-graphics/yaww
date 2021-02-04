@@ -1,0 +1,21 @@
+[package]
+name = "yaww"
+version = "0.1.0"
+authors = ["not_a_seagull <jtnunley01@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+bitflags = "1.2.1"
+event-listener = "2.5.1"
+flume = { version = "0.10.1", default-features = false }
+log = "0.4"
+
+[dependencies.winapi]
+version = "0.3.9"
+features = ["errhandlingapi", "libloaderapi", "minwindef", "ntdef", "processthreadsapi", "winbase", "windef", "winuser"]
+
+[dev-dependencies]
+env_logger = { version = "0.8.2", default-features = false, features = ["atty", "termcolor"] }
+
+[features]
+async = ["flume/async"]

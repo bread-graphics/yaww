@@ -1,0 +1,80 @@
+// MIT/Apache2 License
+
+use crate::{
+    brush::Brush,
+    cursor::Cursor,
+    gui_thread::{Directive, GuiThread},
+    icon::Icon,
+};
+use std::{borrow::Cow, ffi::CStr};
+use winapi::{shared::minwindef::UINT, um::winuser};
+
+bitflags::bitflags! {
+    #[doc = "Flags used for the window class."]
+    pub struct ClassStyle: UINT {
+        const BYTE_ALIGN_CLIENT = winuser::CS_BYTEALIGNCLIENT;
+        const BYTE_ALIGN_WINDOW = winuser::CS_BYTEALIGNWINDOW;
+        const CLASS_DC = winuser::CS_CLASSDC;
+        const DOUBLE_CLICKS = winuser::CS_DBLCLKS;
+        const DROP_SHADOW = winuser::CS_DROPSHADOW;
+        const GLOBAL_CLASS = winuser::CS_GLOBALCLASS;
+        const H_REDRAW = winuser::CS_HREDRAW;
+        const NO_CLOSE = winuser::CS_NOCLOSE;
+        const OWN_DC = winuser::CS_OWNDC;
+        const PARRENT_DC = winuser::CS_PARENTDC;
+        const SAVE_BITS = winuser::CS_SAVEBITS;
+        const V_REDRAW = winuser::CS_VREDRAW;
+    }
+}
+
+impl GuiThread {
+    /// Register a window class.
+    #[inline]
+    pub fn register_class<CN: Into<Cow<'static, CStr>>>(
+        &self,
+        class_name: CN,
+        menu_name: Option<Cow<'static, CStr>>,
+        style: ClassStyle,
+        icon: Option<Icon>,
+        small_icon: Option<Icon>,
+        cursor: Option<Cursor>,
+        brush: Option<Brush>,
+    ) -> crate::Result {
+        self.send_directive(Directive::RegisterClass {
+            class_name: class_name.into(),
+            menu_name: menu_name,
+            style,
+            icon,
+            small_icon,
+            cursor,
+            background: brush,
+        })?;
+        Ok(())
+    }
+
+    /// Register a window class, async redox.
+    #[cfg(feature = "async")]
+    #[inline]
+    pub async fn register_class_async<CN: Into<Cow<'static, CStr>>>(
+        &self,
+        class_name: CN,
+        menu_name: Option<Cow<'static, CStr>>,
+        style: ClassStyle,
+        icon: Option<Icon>,
+        small_icon: Option<Icon>,
+        cursor: Option<Cursor>,
+        brush: Option<Brush>,
+    ) -> crate::Result {
+        self.send_directive_async(Directive::RegisterClass {
+            class_name: class_name.into(),
+            menu_name: menu_name,
+            style,
+            icon,
+            small_icon,
+            cursor,
+            background: brush,
+        })
+        .await?;
+        Ok(())
+    }
+}
