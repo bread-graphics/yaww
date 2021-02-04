@@ -1,11 +1,10 @@
 // MIT/Apache2 License
 
 use super::{process_directive, Directive, Event, Provider, Response};
-use crate::wndproc::WindowData;
+use crate::{refcell::RefCell, wndproc::WindowData};
 use event_listener::Event as LEvent;
 use flume::{Receiver, Sender};
 use std::{
-    cell::RefCell,
     collections::HashMap,
     mem::{self, MaybeUninit},
     pin::Pin,
@@ -13,6 +12,7 @@ use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
+        Mutex,
     },
     thread,
 };

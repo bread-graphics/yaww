@@ -8,11 +8,11 @@ use crate::{
     cursor::Cursor,
     icon::Icon,
     menu::Menu,
+    refcell::RefCell,
     window::{ClassStyle, ExtendedWindowStyle, ShowWindowCommand, Window, WindowStyle},
     wndproc::{yaww_wndproc, WindowData},
 };
 use std::{
-    cell::RefCell,
     ffi::CStr,
     mem,
     ptr::{self, NonNull},
@@ -32,11 +32,8 @@ pub(crate) fn process_directive(
         Directive::SetEventHandler(event) => {
             // SAFETY: we're single-threaded so we'll never actually
             //         have more than one access at once
-            log::trace!("Borrowing window data");
             let mut wd = window_data.borrow_mut();
             wd.event_handler = event;
-            log::trace!("Dropping window data");
-            mem::drop(wd);
             Ok(Response::Empty)
         }
         Directive::RegisterClass {
@@ -165,11 +162,9 @@ fn create_window(
     // increment the window count. we set up the GUI thread loop to exit if the window count
     // reaches zero during a wait cycle, and the window decrements the count when it is
     // destroyed
-    log::trace!("Borrowing window data");
     let mut window_data = data_pointer.borrow_mut();
     window_data.window_count += 1;
     log::debug!("Window count is now {}", window_data.window_count);
-    log::trace!("Dropping window data");
     mem::drop(window_data);
 
     let res = unsafe {

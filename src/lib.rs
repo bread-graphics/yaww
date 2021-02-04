@@ -10,6 +10,8 @@ pub mod icon;
 pub mod menu;
 pub mod ptr;
 pub mod window;
+
+pub(crate) mod refcell;
 pub(crate) mod wndproc;
 
 pub use error::*;

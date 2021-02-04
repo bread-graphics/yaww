@@ -1,8 +1,11 @@
 // MIT/Apache2 License
 
-use crate::gui_thread::{Directive, Event, Response};
+use crate::{
+    gui_thread::{Directive, Event, Response},
+    refcell::RefCell,
+};
 use flume::Sender;
-use std::{cell::RefCell, mem, ptr::NonNull};
+use std::{mem, ptr::NonNull, sync::Mutex};
 use winapi::{
     shared::{
         minwindef::{LPARAM, LRESULT, UINT, WPARAM},
@@ -52,10 +55,8 @@ pub(crate) unsafe extern "system" fn yaww_wndproc(
         }
     };
 
-    log::trace!("Borrowing window data");
     let mut dw = window_data.borrow_mut();
     let res = wndproc_inner(hwnd, msg, wparam, lparam, &mut dw);
-    log::trace!("Dropping window data");
     mem::drop(dw);
     res
 }
