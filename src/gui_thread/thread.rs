@@ -11,8 +11,7 @@ use std::{
     ptr::{self, NonNull},
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc,
-        Mutex,
+        Arc, Mutex,
     },
     thread,
 };

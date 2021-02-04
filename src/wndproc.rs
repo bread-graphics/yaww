@@ -2,7 +2,7 @@
 
 use crate::{
     gui_thread::{Directive, Event, Response},
-    refcell::RefCell,
+    refcell::{RefCell, RefMut},
 };
 use flume::Sender;
 use std::{mem, ptr::NonNull, sync::Mutex};
@@ -48,17 +48,33 @@ pub(crate) unsafe extern "system" fn yaww_wndproc(
             // when we first create the window, we pass in a pointer in the lparam slot to the original
             // data, so we should probably set it here
             if msg == WM_NCCREATE {
-                SetWindowLongPtrA(hwnd.as_ptr(), GWLP_USERDATA, lparam);
+                // convert lparam to a CREATESTRUCT pointer
+                if lparam != 0 {
+                    let create_params = &*(lparam as *const CREATESTRUCTA);
+                    SetWindowLongPtrA(
+                        hwnd.as_ptr(),
+                        GWLP_USERDATA,
+                        create_params.lpCreateParams as _,
+                    );
+                }
             }
 
             return DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam);
         }
     };
 
-    let mut dw = window_data.borrow_mut();
+    let mut dw = Some(window_data.borrow_mut());
     let res = wndproc_inner(hwnd, msg, wparam, lparam, &mut dw);
     mem::drop(dw);
-    res
+
+    match res {
+        Some(res) => res,
+        None => {
+            // default behavior is to defer to the default window proc and let win32
+            // handle important stuff
+            DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam)
+        }
+    }
 }
 
 fn wndproc_inner(
@@ -66,22 +82,22 @@ fn wndproc_inner(
     msg: UINT,
     wparam: WPARAM,
     lparam: LPARAM,
-    window_data: &mut WindowData,
-) -> LRESULT {
+    window_data: &mut Option<RefMut<'_, WindowData>>,
+) -> Option<LRESULT> {
     // match on the message
     match msg {
         WM_DESTROY => {
+            let mut window_data = window_data.take().unwrap();
             window_data.window_count = window_data.window_count.saturating_sub(1);
             log::debug!("Window count is now {}", window_data.window_count);
             if window_data.waiting && window_data.window_count == 0 {
                 log::debug!("Posting quit message into queue");
                 unsafe { PostQuitMessage(0) };
+                return Some(0);
             }
         }
         _ => (),
     }
 
-    // default behavior is to defer to the default window proc and let win32
-    // handle important stuff
-    unsafe { DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam) }
+    None
 }

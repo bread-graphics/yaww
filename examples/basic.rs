@@ -10,7 +10,7 @@ const CLASS_NAME: ConstCstr<'static> = ConstCstr::new(&*b"examples_basic_class\0
 const WINDOW_NAME: ConstCstr<'static> = ConstCstr::new(&*b"YAWW Example\0");
 
 fn main() -> Result {
-    env_logger::Builder::new().filter(Some("yaww"), log::LevelFilter::Trace).init();
+    env_logger::Builder::new().filter(Some("yaww"), log::LevelFilter::Debug).init();
 
     let gui_thread = GuiThread::new();
     gui_thread.register_class(

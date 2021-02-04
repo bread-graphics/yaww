@@ -23,7 +23,7 @@ impl<T> RefCell<T> {
     #[inline]
     pub fn borrow_mut(&self) -> RefMut<'_, T> {
         #[cfg(debug_assertions)]
-        log::trace!("Borrowed refcell mutably");
+        log::trace!("Borrowed refcell mutably",);
 
         RefMut(self.0.borrow_mut())
     }
