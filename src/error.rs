@@ -40,14 +40,14 @@ impl fmt::Display for Error {
                 code,
                 description,
                 calling_function: None,
-            } => write!(f, "Win32 Error Code ({}): {:?}", code, description),
+            } => write!(f, "Win32 Error ({}): {:?}", code, description),
             Self::Win32Error {
                 code,
                 description,
                 calling_function: Some(cf),
             } => write!(
                 f,
-                "Win32 Error Code while calling {} ({}): {:?}",
+                "Win32 Error while calling {} ({}): {:?}",
                 cf, code, description
             ),
             Self::ErrorFailed => f.write_str("Failed to get error"),

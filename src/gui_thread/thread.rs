@@ -114,16 +114,15 @@ pub(crate) fn create(
                 match res {
                     // -1 indicates an error has occurred in GetMessageA proper
                     -1 => {
-                        if send
-                            .send(Err(crate::Error::win32_error(Some("GetMessageA"))))
-                            .is_err()
-                        {
-                            break;
-                        }
+                        send.send(Err(crate::Error::win32_error(Some("GetMessageA"))))
+                            .ok();
+
+                        break;
                     }
                     // 0 indicates we have received WM_QUIT and should exit
                     0 => break,
                     _ => {
+                        // SAFETY: at this point the message is guaranteed to be initialized
                         let msg = unsafe {
                             mem::replace(&mut message, MaybeUninit::uninit()).assume_init()
                         };

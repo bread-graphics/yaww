@@ -53,7 +53,7 @@ impl Directive {
     #[inline]
     pub fn is_empty(&self) -> bool {
         match self {
-            Self::SetEventHandler(_) | Self::ShowWindow { .. } | Self::BeginWait => true,
+            Self::SetEventHandler(_) | Self::ShowWindow { .. } | Self::BeginWait | Self::Dummy => true,
             _ => false,
         }
     }

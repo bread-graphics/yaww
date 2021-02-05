@@ -67,12 +67,10 @@ pub(crate) unsafe extern "system" fn yaww_wndproc(
     impl Drop for AbortOnPanic {
         #[inline]
         fn drop(&mut self) {
-            log::error!("Panicked during wndproc, aborting via panick on panick...");
-            panic!("Panic during panic");
+            log::error!("Panicked during wndproc, aborting...");
+            std::process::abort();
         }
     }
-
-    let _guard = AbortOnPanic;
 
     // if the window is null, there isn't much we can do
     // forward it to DefWindowProcA
@@ -106,6 +104,8 @@ pub(crate) unsafe extern "system" fn yaww_wndproc(
             return DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam);
         }
     };
+
+    let _guard = AbortOnPanic;
 
     let res = wndproc_inner(hwnd, msg, wparam, lparam, window_data);
 
@@ -159,6 +159,7 @@ fn use_event_loop(window_data: &WindowData, event: Event) {
         .relax_directive_thread
         .store(true, Ordering::SeqCst);
     if window_data.directive_send.send(Directive::Dummy).is_err() {
+        log::error!("Directive thread is closed!");
         panic!("If the directive thread is closed down, then it's probably panicked");
     }
 
