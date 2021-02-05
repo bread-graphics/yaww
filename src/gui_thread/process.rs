@@ -25,14 +25,13 @@ use winapi::{
 #[inline]
 pub(crate) fn process_directive(
     directive: Directive,
-    provider: &mut Provider,
-    window_data: &RefCell<WindowData>,
+    window_data: &WindowData,
 ) -> crate::Result<Response> {
     match directive {
         Directive::SetEventHandler(event) => {
             // SAFETY: we're single-threaded so we'll never actually
             //         have more than one access at once
-            let mut wd = window_data.borrow_mut();
+            let mut wd = window_data.exclusive.borrow_mut();
             wd.event_handler = event;
             Ok(Response::Empty)
         }
@@ -45,7 +44,7 @@ pub(crate) fn process_directive(
             background,
             menu_name,
         } => register_class(
-            provider,
+            window_data,
             &class_name,
             style,
             icon,
@@ -66,7 +65,6 @@ pub(crate) fn process_directive(
             parent,
             menu,
         } => create_window(
-            provider,
             window_data,
             &class_name,
             &window_name,
@@ -79,14 +77,14 @@ pub(crate) fn process_directive(
             parent,
             menu,
         ),
-        Directive::ShowWindow { window, command } => show_window(provider, window, command),
+        Directive::ShowWindow { window, command } => show_window(window_data, window, command),
         _ => Ok(Response::Empty),
     }
 }
 
 #[inline]
 fn register_class(
-    provider: &mut Provider,
+    window_data: &WindowData,
     class_name: &CStr,
     style: ClassStyle,
     icon: Option<Icon>,
@@ -95,6 +93,8 @@ fn register_class(
     background: Option<Brush>,
     menu_name: Option<&CStr>,
 ) -> crate::Result<Response> {
+    let mut provider = window_data.provider.borrow_mut();
+
     let icon_ptr = match icon {
         Some(icon) => provider.translate(icon)?.as_ptr(),
         None => ptr::null_mut(),
@@ -116,6 +116,8 @@ fn register_class(
         Some(brush) => provider.translate(brush)?,
         None => unsafe { NonNull::new_unchecked((winuser::COLOR_WINDOW as usize + 1) as *mut ()) },
     };
+
+    mem::drop(provider);
 
     // create the window class struct
     let cls = winuser::WNDCLASSEXA {
@@ -146,8 +148,7 @@ fn register_class(
 
 #[inline]
 fn create_window(
-    provider: &mut Provider,
-    data_pointer: &RefCell<WindowData>,
+    window_data: &WindowData,
     class_name: &CStr,
     window_name: &CStr,
     style: WindowStyle,
@@ -162,10 +163,20 @@ fn create_window(
     // increment the window count. we set up the GUI thread loop to exit if the window count
     // reaches zero during a wait cycle, and the window decrements the count when it is
     // destroyed
-    let mut window_data = data_pointer.borrow_mut();
-    window_data.window_count += 1;
-    log::debug!("Window count is now {}", window_data.window_count);
-    mem::drop(window_data);
+    let mut ex = window_data.exclusive.borrow_mut();
+    ex.window_count += 1;
+    log::debug!("Window count is now {}", ex.window_count);
+    mem::drop(ex);
+
+    let mut provider = window_data.provider.borrow_mut();
+    let parent = match parent {
+        Some(parent) => provider.translate(parent)?.as_ptr().cast(),
+        None => ptr::null_mut(),
+    };
+    let menu = match menu {
+        Some(parent) => provider.translate(parent)?.as_ptr().cast(),
+        None => ptr::null_mut(),
+    };
 
     let res = unsafe {
         winuser::CreateWindowExA(
@@ -177,16 +188,10 @@ fn create_window(
             y,
             width,
             height,
-            match parent {
-                Some(parent) => provider.translate(parent)?.as_ptr().cast(),
-                None => ptr::null_mut(),
-            },
-            match menu {
-                Some(parent) => provider.translate(parent)?.as_ptr().cast(),
-                None => ptr::null_mut(),
-            },
+            parent,
+            menu,
             unsafe { libloaderapi::GetModuleHandleW(ptr::null()) },
-            data_pointer as *const RefCell<WindowData> as *mut RefCell<WindowData> as *mut _,
+            window_data as *const WindowData as *mut WindowData as *mut _,
         )
     };
 
@@ -200,10 +205,14 @@ fn create_window(
 
 #[inline]
 fn show_window(
-    provider: &mut Provider,
+    window_data: &WindowData,
     window: Window,
     command: ShowWindowCommand,
 ) -> crate::Result<Response> {
-    unsafe { winuser::ShowWindow(provider.translate(window)?.cast().as_ptr(), command.bits()) };
+    let mut provider = window_data.provider.borrow_mut();
+    let window = provider.translate(window)?.cast().as_ptr();
+    mem::drop(provider);
+
+    unsafe { winuser::ShowWindow(window, command.bits()) };
     Ok(Response::Empty)
 }

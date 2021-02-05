@@ -1,7 +1,10 @@
 // MIT/Apache2 License
 
 use super::{process_directive, Directive, Event, Provider, Response};
-use crate::{refcell::RefCell, wndproc::WindowData};
+use crate::{
+    refcell::RefCell,
+    wndproc::{DirectiveLock, WindowData, WindowDataExclusive},
+};
 use event_listener::Event as LEvent;
 use flume::{Receiver, Sender};
 use std::{
@@ -10,7 +13,7 @@ use std::{
     pin::Pin,
     ptr::{self, NonNull},
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
     },
     thread,
@@ -30,6 +33,7 @@ const WM_YAWW_DIRECTIVE: UINT = winuser::WM_USER + 0x1337;
 pub(crate) fn create(
     recv: Receiver<Directive>,
     send: Sender<crate::Result<Response>>,
+    directive_sender: Sender<Directive>, // for sending dummy events
     stop_event: Arc<LEvent>,
 ) {
     // spawn the thread
@@ -37,23 +41,31 @@ pub(crate) fn create(
     thread::Builder::new()
         .name(format!("yaww-gui-thread-{}", index))
         .spawn(move || {
-            // set up a spot on the stack where the event handler will always be
-            // double indirection here is used so we have a single-wide pointer no matter what
+            let directive_lock = Arc::new(DirectiveLock {
+                relax_directive_thread: AtomicBool::new(false),
+                done_processing: LEvent::new(),
+            });
+
+            // window data contains data that we need to pass to the wndproc and also to the directive handler
             // In order to keep santicity of data, a RefCell is used to lock down access
             // Note: since this is single threaded, we could, in theory, replace this with an UnsafeCell
             //       and just pass along the pointer to cut out the overhead of RefCell. I'll try this once
             //       this crate is in a good enough place to run benchmarks.
-            let window_data = RefCell::new(WindowData {
-                event_handler: Box::new(|ev| {
-                    log::warn!("Event ignored: {:?}", ev);
-                    Ok(())
+            let window_data = WindowData {
+                exclusive: RefCell::new(WindowDataExclusive {
+                    event_handler: Box::new(|ev| {
+                        log::warn!("Event ignored: {:?}", ev);
+                        Ok(())
+                    }),
+                    window_count: 0,
+                    waiting: false,
                 }),
-                window_count: 0,
-                waiting: false,
-            });
-
-            // translates keys to Win32 pointers and vice versa
-            let mut provider = Provider::new();
+                provider: RefCell::new(Provider::new()),
+                directive_lock: directive_lock.clone(),
+                recv: recv.clone(),
+                send: send.clone(),
+                directive_send: directive_sender,
+            };
 
             // get the current thread id so we can pass that into the receiver thread
             let sender_thread_id = unsafe { GetCurrentThreadId() };
@@ -64,7 +76,14 @@ pub(crate) fn create(
                 .name(format!("yaww-gui-thread-recv-{}", index))
                 .spawn(move || {
                     loop {
+                        if directive_lock.relax_directive_thread.load(Ordering::SeqCst) {
+                            directive_lock.done_processing.listen().wait();
+                            continue;
+                        }
+
                         let directive = match recv.recv() {
+                            // dummy directives are used to flush the loop
+                            Ok(Directive::Dummy) => continue,
                             Ok(directive) => directive,
                             // if it's failed, just quit the thread
                             Err(_) => return,
@@ -93,7 +112,16 @@ pub(crate) fn create(
                 let res =
                     unsafe { winuser::GetMessageA(message.as_mut_ptr(), ptr::null_mut(), 0, 0) };
                 match res {
-                    -1 => unreachable!("TODO: handle errors"),
+                    // -1 indicates an error has occurred in GetMessageA proper
+                    -1 => {
+                        if send
+                            .send(Err(crate::Error::win32_error(Some("GetMessageA"))))
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    // 0 indicates we have received WM_QUIT and should exit
                     0 => break,
                     _ => {
                         let msg = unsafe {
@@ -109,24 +137,14 @@ pub(crate) fn create(
                             // if we are beginning a wait cycle, say as such
                             if let Directive::BeginWait = &*directive {
                                 log::trace!("Borrowing window data");
-                                let mut wd = window_data.borrow_mut();
+                                let mut wd = window_data.exclusive.borrow_mut();
                                 wd.waiting = true;
                                 log::trace!("Dropping window data");
                                 mem::drop(wd);
                                 continue;
                             }
 
-                            let is_empty = directive.is_empty();
-                            let res = process_directive(*directive, &mut provider, &window_data);
-                            if res.is_err() || !is_empty {
-                                if send.send(res).is_err() {
-                                    // the other end of the connection has closed, so we should shut down
-                                    // shop as well
-                                    // this is easy to do just by sending a quit message into the
-                                    // input stream
-                                    unsafe { winuser::PostQuitMessage(0) };
-                                }
-                            }
+                            handle_directive_processing(*directive, &window_data);
                         } else {
                             unsafe {
                                 winuser::TranslateMessage(&msg);
@@ -142,4 +160,21 @@ pub(crate) fn create(
             stop_event.notify(std::usize::MAX);
         })
         .expect("Unable to spawn Yaww GUI Thread");
+}
+
+/// Note: this function doesn't handle BeginWait (even though in any sane configuration it
+///       shouldn't need to)
+#[inline]
+pub(crate) fn handle_directive_processing(directive: Directive, window_data: &WindowData) {
+    let is_empty = directive.is_empty();
+    let res = process_directive(directive, window_data);
+    if res.is_err() || !is_empty {
+        if window_data.send.send(res).is_err() {
+            // the other end of the connection has closed, so we should shut down
+            // shop as well
+            // this is easy to do just by sending a quit message into the
+            // input stream
+            unsafe { winuser::PostQuitMessage(0) };
+        }
+    }
 }

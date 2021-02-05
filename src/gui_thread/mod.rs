@@ -42,6 +42,7 @@ pub use message::{Directive, Event, Response};
 pub(crate) use process::process_directive;
 pub use provider::Key;
 pub(crate) use provider::{KeyType, Provider};
+pub(crate) use thread::handle_directive_processing;
 
 use event_listener::Event as LEvent;
 use flume::{Receiver, Sender};
@@ -71,7 +72,12 @@ impl GuiThread {
         let (directive_send, directive_recv) = flume::unbounded();
         let (response_send, response_recv) = flume::unbounded();
         let stop_event = Arc::new(LEvent::new());
-        thread::create(directive_recv, response_send, stop_event.clone());
+        thread::create(
+            directive_recv,
+            response_send,
+            directive_send.clone(),
+            stop_event.clone(),
+        );
         Self {
             send: directive_send,
             recv: response_recv,

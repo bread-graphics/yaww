@@ -44,6 +44,8 @@ pub enum Directive {
     },
     MoveWindow,
     BeginWait,
+    #[doc(hidden)]
+    Dummy,
 }
 // TODO: fmt::debug
 
