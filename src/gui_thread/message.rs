@@ -42,7 +42,14 @@ pub enum Directive {
         window: Window,
         command: ShowWindowCommand,
     },
-    MoveWindow,
+    MoveWindow {
+        window: Window,
+        x: c_int,
+        y: c_int,
+        width: c_int,
+        height: c_int,
+        repaint: bool,
+    },
     BeginWait,
     #[doc(hidden)]
     Dummy,
@@ -53,7 +60,11 @@ impl Directive {
     #[inline]
     pub fn is_empty(&self) -> bool {
         match self {
-            Self::SetEventHandler(_) | Self::ShowWindow { .. } | Self::BeginWait | Self::Dummy => true,
+            Self::SetEventHandler(_)
+            | Self::ShowWindow { .. }
+            | Self::MoveWindow { .. }
+            | Self::BeginWait
+            | Self::Dummy => true,
             _ => false,
         }
     }

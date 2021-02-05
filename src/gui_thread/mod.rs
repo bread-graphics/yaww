@@ -49,7 +49,7 @@ use flume::{Receiver, Sender};
 use std::{collections::HashMap, sync::Arc};
 
 #[cfg(feature = "async")]
-use futures_lite::future;
+use futures_lite::future::{self, Future};
 
 /// Interface to the common GUI thread.
 ///

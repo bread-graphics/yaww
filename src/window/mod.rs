@@ -187,4 +187,50 @@ impl Window {
         .await?;
         Ok(())
     }
+
+    /// Move this window.
+    #[inline]
+    pub fn move_window(
+        self,
+        gt: &GuiThread,
+        x: c_int,
+        y: c_int,
+        width: c_int,
+        height: c_int,
+        repaint: bool,
+    ) -> crate::Result {
+        gt.send_directive(Directive::MoveWindow {
+            window: self,
+            x,
+            y,
+            width,
+            height,
+            repaint,
+        })?;
+        Ok(())
+    }
+
+    /// Move this window, async redox.
+    #[cfg(feature = "async")]
+    #[inline]
+    pub async fn move_window_async(
+        self,
+        gt: &GuiThread,
+        x: c_int,
+        y: c_int,
+        width: c_int,
+        height: c_int,
+        repaint: bool,
+    ) -> crate::Result {
+        gt.send_directive_async(Directive::MoveWindow {
+            window: self,
+            x,
+            y,
+            width,
+            height,
+            repaint,
+        })
+        .await?;
+        Ok(())
+    }
 }

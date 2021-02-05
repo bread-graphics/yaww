@@ -19,6 +19,7 @@ use std::{
 };
 use winapi::{
     ctypes::c_int,
+    shared::minwindef::BOOL,
     um::{libloaderapi, winuser},
 };
 
@@ -77,6 +78,14 @@ pub(crate) fn process_directive(
             parent,
             menu,
         ),
+        Directive::MoveWindow {
+            window,
+            x,
+            y,
+            width,
+            height,
+            repaint,
+        } => move_window(window_data, window, x, y, width, height, repaint),
         Directive::ShowWindow { window, command } => show_window(window_data, window, command),
         _ => Ok(Response::Empty),
     }
@@ -215,4 +224,25 @@ fn show_window(
 
     unsafe { winuser::ShowWindow(window, command.bits()) };
     Ok(Response::Empty)
+}
+
+#[inline]
+fn move_window(
+    window_data: &WindowData,
+    window: Window,
+    x: c_int,
+    y: c_int,
+    width: c_int,
+    height: c_int,
+    repaint: bool,
+) -> crate::Result<Response> {
+    let mut provider = window_data.provider.borrow_mut();
+    let window = provider.translate(window)?.cast().as_ptr();
+    mem::drop(provider);
+
+    if unsafe { winuser::MoveWindow(window, x, y, width, height, repaint as BOOL) } == 0 {
+        Err(crate::Error::win32_error(Some("MoveWindow")))
+    } else {
+        Ok(Response::Empty)
+    }
 }
