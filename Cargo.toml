@@ -9,6 +9,7 @@ bitflags = "1.2.1"
 event-listener = "2.5.1"
 flume = { version = "0.10.1", default-features = false }
 futures-lite = { version = "1.11.3", optional = true }
+gluten-keyboard = "0.1.2"
 log = "0.4"
 
 [dependencies.winapi]

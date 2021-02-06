@@ -1,13 +1,17 @@
 // MIT/Apache2 License
 
 use crate::{
-    gui_thread::{handle_directive_processing, Directive, Event, Provider, Response},
+    gui_thread::{
+        handle_directive_processing, Directive, Event, KeyType, Provider, Response, SpecialResize,
+    },
     refcell::RefCell,
+    window::Window,
 };
 use event_listener::Event as LEvent;
 use flume::{Receiver, Sender};
 use std::{
-    mem, panic,
+    mem::{self, MaybeUninit},
+    panic,
     ptr::NonNull,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -16,7 +20,7 @@ use std::{
 };
 use winapi::{
     shared::{
-        minwindef::{LPARAM, LRESULT, UINT, WPARAM},
+        minwindef::{HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
         windef::{HWND, HWND__},
     },
     um::winuser::*,
@@ -129,9 +133,15 @@ fn wndproc_inner(
     lparam: LPARAM,
     window_data: &WindowData,
 ) -> Option<LRESULT> {
+    // translate this hwnd to a window key
+    let window = unsafe { Window::from_pointer(hwnd.cast(), KeyType::Window) };
+
     // match on the message
     match msg {
         WM_DESTROY => {
+            // while we're here we also get rid of the key in the provider
+            window_data.provider.borrow_mut().remove_key(hwnd.cast());
+
             // decrement the window count
             let mut window_data = window_data.exclusive.borrow_mut();
             window_data.window_count = window_data.window_count.saturating_sub(1);
@@ -144,6 +154,99 @@ fn wndproc_inner(
                 unsafe { PostQuitMessage(0) };
                 return Some(0);
             }
+        }
+        WM_CLOSE => {
+            // notify of a close event
+            use_event_loop(window_data, Event::Close(window));
+
+            // destroy the window once it is closed
+            unsafe { DestroyWindow(hwnd.as_ptr()) };
+        }
+        WM_MOVE => {
+            let x = LOWORD(lparam as _);
+            let y = HIWORD(lparam as _);
+            use_event_loop(window_data, Event::Move { window, x, y });
+        }
+        WM_SIZE => {
+            let width = LOWORD(lparam as _);
+            let height = HIWORD(lparam as _);
+            let special = match wparam {
+                SIZE_MINIMIZED => Some(SpecialResize::Minimized),
+                SIZE_MAXIMIZED => Some(SpecialResize::Maximized),
+                SIZE_MAXHIDE => Some(SpecialResize::MaxHide),
+                SIZE_MAXSHOW => Some(SpecialResize::MaxShow),
+                _ => None,
+            };
+
+            use_event_loop(
+                window_data,
+                Event::Size {
+                    window,
+                    width,
+                    height,
+                    special,
+                },
+            );
+        }
+        WM_ACTIVATE => {
+            let event = match wparam as _ {
+                WA_ACTIVE => Event::Activate {
+                    window,
+                    from_mouse_click: false,
+                },
+                WA_CLICKACTIVE => Event::Activate {
+                    window,
+                    from_mouse_click: true,
+                },
+                WA_INACTIVE => Event::Deactivate(window),
+                _ => return None, // server error?
+            };
+
+            use_event_loop(window_data, event);
+        }
+        WM_SETFOCUS => {
+            use_event_loop(window_data, Event::SetFocus(window));
+        }
+        WM_KILLFOCUS => {
+            use_event_loop(window_data, Event::KillFocus(window));
+        }
+        WM_ENABLE => {
+            use_event_loop(
+                window_data,
+                if wparam == 0 {
+                    Event::Disable(window)
+                } else {
+                    Event::Enable(window)
+                },
+            );
+        }
+        WM_PAINT => {
+            // run DefWindowProcA ahead of time, so the background is painted already
+            unsafe { DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam) };
+
+            // create the painter object
+            let mut ps = MaybeUninit::<PAINTSTRUCT>::uninit();
+            let hdc = unsafe { BeginPaint(hwnd.as_ptr(), ps.as_mut_ptr()) };
+            let hdc = match NonNull::new(hdc) {
+                Some(hdc) => hdc,
+                // we can't do anything with a null dc, just return if this is the case
+                None => return Some(0),
+            };
+
+            // convert the HDC to a key
+            let drawer = window_data
+                .provider
+                .borrow_mut()
+                .create_key(hdc.cast(), KeyType::Dc)
+                .unwrap();
+            use_event_loop(window_data, Event::Paint { window, dc: drawer });
+            window_data.provider.borrow_mut().remove_key(hdc.cast());
+
+            // end the paint now
+            unsafe { EndPaint(hwnd.as_ptr(), ps.as_ptr()) };
+
+            // suppress the DefWindowProcA at the end
+            return Some(0);
         }
         _ => (),
     }

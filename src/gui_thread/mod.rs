@@ -38,7 +38,7 @@ mod process;
 mod provider;
 mod thread;
 
-pub use message::{Directive, Event, Response};
+pub use message::{Directive, Event, Response, SpecialResize};
 pub(crate) use process::process_directive;
 pub use provider::Key;
 pub(crate) use provider::{KeyType, Provider};

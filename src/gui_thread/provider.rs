@@ -26,6 +26,19 @@ pub struct Key {
     ty: KeyType,
 }
 
+impl Key {
+    pub(crate) unsafe fn from_pointer(pointer: NonNull<()>, ty: KeyType) -> Key {
+        #[cfg(not(debug_assertions))]
+        let _ = ty;
+
+        Key {
+            key: unsafe { NonZeroUsize::new_unchecked(pointer.as_ptr() as usize) },
+            #[cfg(debug_assertions)]
+            ty,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum KeyType {
     None,
@@ -34,6 +47,7 @@ pub(crate) enum KeyType {
     Icon,
     Cursor,
     Menu,
+    Dc,
 }
 
 /// Provides matches between data keys and data.
@@ -75,6 +89,20 @@ impl Provider {
             Ok(Key {
                 key: unsafe { NonZeroUsize::new_unchecked(pointer.as_ptr() as usize) },
             })
+        }
+    }
+
+    #[inline]
+    pub fn remove_key(&mut self, pointer: NonNull<()>) {
+        #[cfg(debug_assertions)]
+        {
+            let key = unsafe { NonZeroUsize::new_unchecked(pointer.as_ptr() as usize) };
+            self.type_map.remove(&key);
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
+            let _ = pointer;
         }
     }
 

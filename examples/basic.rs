@@ -35,7 +35,7 @@ fn main() -> Result {
         None,
     )?;
     window.show(&gui_thread, ShowWindowCommand::SHOW)?;
-    gui_thread.set_event_handler(|_| Ok(()))?;
+    gui_thread.set_event_handler(|ev| { println!("{:?}", ev); Ok(()) })?;
 
     gui_thread.wait()?;
 

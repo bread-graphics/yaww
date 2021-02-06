@@ -4,6 +4,7 @@
 
 pub mod brush;
 pub mod cursor;
+pub mod dc;
 mod error;
 pub mod gui_thread;
 pub mod icon;

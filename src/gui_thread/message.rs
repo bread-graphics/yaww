@@ -3,16 +3,49 @@
 use crate::{
     brush::Brush,
     cursor::Cursor,
+    dc::Dc,
     icon::Icon,
     menu::Menu,
     window::{ClassStyle, ExtendedWindowStyle, ShowWindowCommand, Window, WindowStyle},
 };
 use std::{borrow::Cow, ffi::CStr, fmt};
-use winapi::ctypes::c_int;
+use winapi::ctypes::{c_int, c_ushort};
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SpecialResize {
+    Maximized,
+    Minimized,
+    MaxHide,
+    MaxShow,
+}
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    Paint,
+    Close(Window),
+    Move {
+        window: Window,
+        x: c_ushort,
+        y: c_ushort,
+    },
+    Size {
+        window: Window,
+        width: c_ushort,
+        height: c_ushort,
+        special: Option<SpecialResize>,
+    },
+    Activate {
+        window: Window,
+        from_mouse_click: bool,
+    },
+    Deactivate(Window),
+    SetFocus(Window),
+    KillFocus(Window),
+    Enable(Window),
+    Disable(Window),
+    Paint {
+        window: Window,
+        dc: Dc,
+    },
 }
 
 pub enum Directive {
