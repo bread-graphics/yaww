@@ -38,7 +38,9 @@ mod process;
 mod provider;
 mod thread;
 
-pub use message::{Directive, Event, Point, RasterOperation, Response, SpecialResize};
+pub use message::{
+    DebugContainer, Directive, Event, Point, RasterOperation, Response, SpecialResize,
+};
 pub(crate) use process::process_directive;
 pub use provider::Key;
 pub(crate) use provider::{KeyType, Provider};
@@ -130,9 +132,11 @@ impl GuiThread {
     #[inline]
     pub fn set_event_handler(
         &self,
-        event_handler: impl FnMut(Event) -> crate::Result + Send + 'static,
+        event_handler: impl Fn(Event) -> crate::Result + Send + Sync + 'static,
     ) -> crate::Result {
-        self.send_directive(Directive::SetEventHandler(Box::new(event_handler)))?;
+        self.send_directive(Directive::SetEventHandler(DebugContainer(Box::new(
+            event_handler,
+        ))))?;
         Ok(())
     }
 
@@ -144,10 +148,10 @@ impl GuiThread {
     #[inline]
     pub async fn set_event_handler_async<Fut: Future<Output = crate::Result>>(
         &self,
-        mut event_handler: impl FnMut(Event) -> Fut + Send + 'static,
+        event_handler: impl Fn(Event) -> Fut + Send + Sync + 'static,
     ) -> crate::Result {
         let f = move |event| future::block_on(event_handler(event));
-        self.send_directive_async(Directive::SetEventHandler(Box::new(f)))
+        self.send_directive_async(Directive::SetEventHandler(DebugContainer(Box::new(f))))
             .await?;
         Ok(())
     }

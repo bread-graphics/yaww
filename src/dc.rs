@@ -14,7 +14,7 @@ impl Dc {
     #[inline]
     pub fn create_compatible_dc(self, gt: &GuiThread) -> crate::Result<Dc> {
         let res = gt.send_directive(Directive::CreateCompatibleDc(self))?;
-        res.unwrap_dc()
+        res.unwrap_key()
     }
 
     #[cfg(feature = "async")]
@@ -23,13 +23,13 @@ impl Dc {
         let res = gt
             .send_directive_async(Directive::CreateCompatibleDc(self))
             .await?;
-        res.unwrap_dc()
+        res.unwrap_key()
     }
 
     #[inline]
     pub fn select_object(self, gt: &GuiThread, object: GdiObject) -> crate::Result<GdiObject> {
         let res = gt.send_directive(Directive::SelectObject { dc: self, object })?;
-        res.unwrap_gdiobj()
+        res.unwrap_key()
     }
 
     #[cfg(feature = "async")]
@@ -42,16 +42,7 @@ impl Dc {
         let res = gt
             .send_directive_async(Directive::SelectObject { dc: self, object })
             .await?;
-        res.unwrap_gdiobj()
-    }
-
-    #[cfg(feature = "async")]
-    #[inline]
-    pub async fn create_compatible_dc_async(self, gt: &GuiThread) -> crate::Result<Dc> {
-        let res = gt
-            .send_directive_async(Directive::CreateCompatibleDc(self))
-            .await?;
-        res.unwrap_dc()
+        res.unwrap_key()
     }
 
     #[inline]
@@ -232,7 +223,7 @@ impl Dc {
             dc: self,
             points: points.into(),
         })
-        .awaot?;
+        .await?;
         Ok(())
     }
 
@@ -367,14 +358,14 @@ impl Dc {
     ) -> crate::Result {
         gt.send_directive_async(Directive::Chord {
             dc: self,
-            rect_let,
+            rect_left,
             rect_top,
             rect_right,
             rect_bottom,
             line_x1,
             line_x2,
             line_y1,
-            line_t2,
+            line_y2,
         })
         .await?;
         Ok(())

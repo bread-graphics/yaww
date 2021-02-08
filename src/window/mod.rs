@@ -129,7 +129,7 @@ impl GuiThread {
             parent,
             menu,
         })
-        .and_then(|r| r.unwrap_window())
+        .and_then(|r| r.unwrap_key())
     }
 
     /// Create a new window, async redox.
@@ -161,7 +161,7 @@ impl GuiThread {
             menu,
         })
         .await
-        .and_then(|r| r.unwrap_window())
+        .and_then(|r| r.unwrap_key())
     }
 }
 

@@ -1,5 +1,6 @@
 // MIT/Apache2 License
 
+use super::Key;
 use crate::{
     bitmap::Bitmap,
     brush::Brush,
@@ -9,13 +10,13 @@ use crate::{
     gdiobj::GdiObject,
     icon::Icon,
     menu::Menu,
-    pen::Pen,
+    pen::{Pen, PenStyle},
     window::{ClassStyle, ExtendedWindowStyle, ShowWindowCommand, Window, WindowStyle},
 };
-use std::{borrow::Cow, ffi::CStr, fmt};
+use std::{borrow::Cow, ffi::CStr, fmt, sync::Arc};
 use winapi::{
     ctypes::{c_int, c_ushort},
-    shared::windef::POINT,
+    shared::{ntdef::LONG, windef::POINT},
     um::wingdi,
 };
 
@@ -32,7 +33,29 @@ pub enum RasterOperation {
     SrcCopy,
 }
 
-pub type Point = POINT;
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(C)]
+pub struct Point {
+    pub x: LONG,
+    pub y: LONG,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DebugContainer<T>(pub T);
+
+impl<T> fmt::Debug for DebugContainer<T> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<cannot format>")
+    }
+}
+
+impl<T> From<T> for DebugContainer<T> {
+    #[inline]
+    fn from(t: T) -> Self {
+        Self(t)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Event {
@@ -61,10 +84,12 @@ pub enum Event {
         window: Window,
         dc: Dc,
     },
+    Quit,
 }
 
+#[derive(Debug)]
 pub enum Directive {
-    SetEventHandler(Box<dyn FnMut(Event) -> crate::Result + Send + 'static>),
+    SetEventHandler(DebugContainer<Box<dyn Fn(Event) -> crate::Result + Send + Sync + 'static>>),
 
     // class functions
     RegisterClass {
@@ -187,6 +212,13 @@ pub enum Directive {
         op: RasterOperation,
     },
 
+    // pen functions
+    CreatePen {
+        style: PenStyle,
+        width: c_int,
+        color: Color,
+    },
+
     // bitmap functions
     GetBitmapInfo(Bitmap),
 
@@ -202,55 +234,21 @@ pub enum Directive {
 impl Directive {
     #[inline]
     pub fn is_empty(&self) -> bool {
-        match self {
-            Self::SetEventHandler(_)
-            | Self::ShowWindow { .. }
-            | Self::MoveWindow { .. }
-            | Self::BeginWait
-            | Self::DeleteObject(_)
-            | Self::DeleteDc(_)
-            | Self::SetPixel { .. }
-            | Self::MoveTo { .. }
-            | Self::LineTo { .. }
-            | Self::Rectangle { .. }
-            | Self::Bezier { .. }
-            | Self::Polygon { .. }
-            | Self::BitBlt { .. }
-            | Self::Dummy | Self::DeferEventProcessing => true,
-            _ => false,
-        }
+        false
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum Response {
     Empty,
-    Dc(Dc),
-    GdiObject(GdiObject),
-    Window(Window),
+    Key(Key),
 }
 
 impl Response {
     #[inline]
-    pub fn unwrap_window(self) -> crate::Result<Window> {
+    pub fn unwrap_key(self) -> crate::Result<Key> {
         match self {
-            Self::Window(wnd) => Ok(wnd),
-            _ => Err(crate::Error::TypeMismatch),
-        }
-    }
-
-    #[inline]
-    pub fn unwrap_dc(self) -> crate::Result<Dc> {
-        match self {
-            Self::Dc(dc) => Ok(dc),
-            _ => Err(crate::Error::TypeMismatch),
-        }
-    }
-
-    #[inline]
-    pub fn unwrap_gdiobj(self) -> crate::Result<GdiObject> {
-        match self {
-            Self::GdiObject(o) => Ok(o),
+            Response::Key(k) => Ok(k),
             _ => Err(crate::Error::TypeMismatch),
         }
     }

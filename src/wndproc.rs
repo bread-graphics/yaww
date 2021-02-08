@@ -7,18 +7,18 @@ use crate::{
     refcell::RefCell,
     window::Window,
 };
-use crossbeam_utils::thread;
 use event_listener::Event as LEvent;
 use flume::{Receiver, Sender};
 use std::{
+    cell::Cell,
     mem::{self, MaybeUninit},
     panic,
     ptr::NonNull,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Condvar, Mutex,
     },
-    cell::Cell,
+    thread,
 };
 use winapi::{
     shared::{
@@ -42,7 +42,7 @@ pub(crate) struct WindowData {
 
     // the event handler. this needs to be an Fn() instead of an FnMut(), since the event handling process
     // can sometimes be reentrant.
-    pub event_handler: Box<dyn Fn(Event) -> crate::Result + Send + 'static>,
+    pub event_handler: RefCell<Arc<dyn Fn(Event) -> crate::Result + Send + Sync + 'static>>,
 
     // the current number of windows
     pub window_count: Cell<usize>,
@@ -150,8 +150,12 @@ fn wndproc_inner(
 
             // if the window count has reached zero and we're in a wait cycle (read: there are no
             // more directives to the sent to the loop), send the quit message to the loop
+            // NOTE: on rustc v1.51.0 either I or the compiler is fucking up and omitting the call to check
+            //       waiting, log::trace! gets around that
+            log::trace!("Are we waiting? {}", window_data.waiting.get());
             if window_data.waiting.get() && window_count == 0 {
                 log::debug!("Posting quit message into queue");
+                use_event_loop(window_data, Event::Quit);
                 unsafe { PostQuitMessage(0) };
                 return Some(0);
             }
@@ -272,26 +276,37 @@ fn use_event_loop(window_data: &WindowData, event: Event) {
     // and we don't want to block unless we have to
     // to this end, clone the directive sender so we can send the DeferEventProcessing directive and stop
     // the loop below
-    // note: &mut FnMut() + Send is Send
-    let event_handler = &mut ex.event_handler;
+    // note: since event_handler is an Arc, cloning it prevents the mutable access needed to set it
+    let event_handler = window_data.event_handler.borrow().clone();
     let directive_send = window_data.directive_send.clone();
+    let send = window_data.send.clone();
 
     // spawn a scoped thread, so we can borrow variables from the stack
-    thread::scope(move |s| {
-        let handle = s.builder().name("yaww-event-handler".to_string()).spawn(move |_| {
-            if (event_handler)(event).is_err() {
-               unreachable!("TODO: handle errors");
+    let handle = thread::Builder::new()
+        .name(format!("yaww-event-handler-{}", {
+            static THREAD_COUNTER: AtomicUsize = AtomicUsize::new(0);
+            THREAD_COUNTER.fetch_add(1, Ordering::AcqRel)
+        }))
+        .spawn(move || {
+            if let Err(e) = (event_handler)(event) {
+                send.send(Err(e)).expect("Agh!");
             }
-            directive_send.send(Directive::DeferEventProcessing).unwrap();
-        });
+            mem::drop(event_handler);
+            directive_send
+                .send(Directive::DeferEventProcessing)
+                .unwrap();
+        })
+        .expect("Failed to spawn event handler thread");
 
-        // the event handler may have generated directives for us to process, so process them
-        mem::drop(ex);
-        window_data
-            .recv
-            .try_iter()
-            .for_each(|dir| handle_directive_processing(dir, window_data));
-    });
+    // the event handler may have generated directives for us to process, so process them
+    for dir in window_data.recv.iter() {
+        if let Directive::DeferEventProcessing = dir {
+            break;
+        } else {
+            handle_directive_processing(dir, window_data);
+        }
+    }
+    handle.join().unwrap();
 
     // tell the directive processing thread to start processing events again
     window_data

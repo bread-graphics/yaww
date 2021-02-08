@@ -3,7 +3,7 @@
 use std::{ffi::CStr, ops, os::raw::c_char};
 use yaww::{
     window::{ClassStyle, ExtendedWindowStyle, ShowWindowCommand, WindowStyle},
-    Event, GuiThread, Result,
+    Color, Event, GuiThread, PenStyle, Result,
 };
 
 const CLASS_NAME: ConstCstr<'static> = ConstCstr::new(&*b"examples_basic_class\0");
@@ -38,13 +38,21 @@ fn main() -> Result {
     )?;
     window.show(&gui_thread, ShowWindowCommand::SHOW)?;
 
+    // create a pen
+    let pen = gui_thread.create_pen(PenStyle::Solid, 50, Color::from_rgb(0, 0, 0))?;
+
     let gt_clone = gui_thread.clone();
     gui_thread.set_event_handler(move |ev| {
         println!("{:?}", &ev);
         match ev {
             Event::Paint { dc, .. } => {
+                let hold_pen = dc.select_object(&gt_clone, pen)?;
                 dc.move_to(&gt_clone, 200, 200)?;
                 dc.line_to(&gt_clone, 300, 400)?;
+                dc.select_object(&gt_clone, hold_pen)?;
+            }
+            Event::Quit => {
+                pen.delete(&gt_clone)?;
             }
             _ => (),
         }

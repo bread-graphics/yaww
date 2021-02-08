@@ -3,11 +3,12 @@
 use super::{process_directive, Directive, Event, Provider, Response};
 use crate::{
     refcell::RefCell,
-    wndproc::{DirectiveLock, WindowData, WindowDataExclusive},
+    wndproc::{DirectiveLock, WindowData},
 };
 use event_listener::Event as LEvent;
 use flume::{Receiver, Sender};
 use std::{
+    cell::Cell,
     collections::HashMap,
     mem::{self, MaybeUninit},
     pin::Pin,
@@ -52,14 +53,12 @@ pub(crate) fn create(
             //       and just pass along the pointer to cut out the overhead of RefCell. I'll try this once
             //       this crate is in a good enough place to run benchmarks.
             let window_data = WindowData {
-                exclusive: RefCell::new(WindowDataExclusive {
-                    event_handler: Box::new(|ev| {
-                        log::warn!("Event ignored: {:?}", ev);
-                        Ok(())
-                    }),
-                    window_count: 0,
-                    waiting: false,
-                }),
+                event_handler: RefCell::new(Arc::new(|ev| {
+                    log::warn!("Event ignored: {:?}", ev);
+                    Ok(())
+                })),
+                window_count: Cell::new(0),
+                waiting: Cell::new(false),
                 provider: RefCell::new(Provider::new()),
                 directive_lock: directive_lock.clone(),
                 recv: recv.clone(),
@@ -135,11 +134,8 @@ pub(crate) fn create(
 
                             // if we are beginning a wait cycle, say as such
                             if let Directive::BeginWait = &*directive {
-                                log::trace!("Borrowing window data");
-                                let mut wd = window_data.exclusive.borrow_mut();
-                                wd.waiting = true;
-                                log::trace!("Dropping window data");
-                                mem::drop(wd);
+                                log::debug!("Beginning wait cycle...");
+                                window_data.waiting.set(true);
                                 continue;
                             }
 

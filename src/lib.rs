@@ -19,5 +19,7 @@ pub mod window;
 pub(crate) mod refcell;
 pub(crate) mod wndproc;
 
+pub use color::*;
 pub use error::*;
 pub use gui_thread::{Directive, Event, GuiThread, Response};
+pub use pen::*;

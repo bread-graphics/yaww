@@ -2,12 +2,13 @@
 
 //! Process a message into a directive.
 
-use super::{Directive, KeyType, Provider, RasterOperation, Response};
+use super::{Directive, KeyType, Point, Provider, RasterOperation, Response};
 use crate::{
     brush::Brush,
     cursor::Cursor,
     icon::Icon,
     menu::Menu,
+    pen::PenStyle,
     refcell::RefCell,
     window::{ClassStyle, ExtendedWindowStyle, ShowWindowCommand, Window, WindowStyle},
     wndproc::{yaww_wndproc, WindowData},
@@ -16,10 +17,11 @@ use std::{
     ffi::CStr,
     mem,
     ptr::{self, NonNull},
+    sync::Arc,
 };
 use winapi::{
     ctypes::c_int,
-    shared::minwindef::BOOL,
+    shared::{minwindef::BOOL, windef::POINT},
     um::{libloaderapi, wingdi, winuser},
 };
 
@@ -28,12 +30,12 @@ pub(crate) fn process_directive(
     directive: Directive,
     window_data: &WindowData,
 ) -> crate::Result<Response> {
+    log::debug!("Received directive: {:?}", &directive);
+
     match directive {
         Directive::SetEventHandler(event) => {
-            // SAFETY: we're single-threaded so we'll never actually
-            //         have more than one access at once
-            let mut wd = window_data.exclusive.borrow_mut();
-            wd.event_handler = event;
+            let mut event_handler = window_data.event_handler.borrow_mut();
+            *event_handler = event.0.into();
             Ok(Response::Empty)
         }
         Directive::RegisterClass {
@@ -97,11 +99,13 @@ pub(crate) fn process_directive(
             let dc = window_data.provider.borrow_mut().translate(dc)?;
             let res_dc = unsafe { wingdi::CreateCompatibleDC(dc.cast().as_ptr()) };
             match NonNull::new(res_dc) {
-                Some(res_dc) => Ok(Response::Dc(window_data.provider.borrow_mut().create_key(
-                    res_dc.cast(),
-                    KeyType::Dc,
-                    false,
-                )?)),
+                Some(res_dc) => Ok(Response::Key(
+                    window_data.provider.borrow_mut().create_key(
+                        res_dc.cast(),
+                        KeyType::Dc,
+                        false,
+                    )?,
+                )),
                 None => Err(crate::Error::win32_error(Some("CreateCompatibleDc"))),
             }
         }
@@ -127,7 +131,7 @@ pub(crate) fn process_directive(
                 None => return Err(crate::Error::win32_error(Some("SelectObject"))),
             };
 
-            Ok(Response::GdiObject(res_obj))
+            Ok(Response::Key(res_obj))
         }
         Directive::SetPixel { dc, x, y, color } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
@@ -157,17 +161,35 @@ pub(crate) fn process_directive(
         }
         Directive::Bezier { dc, points } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe { wingdi::PolyBezier(dc.cast().as_ptr(), points.as_ptr(), points.len() as _) };
+            unsafe {
+                wingdi::PolyBezier(
+                    dc.cast().as_ptr(),
+                    points.as_ptr() as *const Point as *const POINT,
+                    points.len() as _,
+                )
+            };
             Ok(Response::Empty)
         }
         Directive::Polygon { dc, points } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe { wingdi::Polygon(dc.cast().as_ptr(), points.as_ptr(), points.len() as _) };
+            unsafe {
+                wingdi::Polygon(
+                    dc.cast().as_ptr(),
+                    points.as_ptr() as *const Point as *const POINT,
+                    points.len() as _,
+                )
+            };
             Ok(Response::Empty)
         }
         Directive::Polyline { dc, points } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe { wingdi::Polyline(dc.cast().as_ptr(), points.as_ptr(), points.len() as _) };
+            unsafe {
+                wingdi::Polyline(
+                    dc.cast().as_ptr(),
+                    points.as_ptr() as *const Point as *const POINT,
+                    points.len() as _,
+                )
+            };
             Ok(Response::Empty)
         }
         Directive::Ellipse {
@@ -266,6 +288,32 @@ pub(crate) fn process_directive(
             };
             Ok(Response::Empty)
         }
+        Directive::CreatePen {
+            style,
+            width,
+            color,
+        } => {
+            let style = match style {
+                PenStyle::Solid => wingdi::PS_SOLID,
+                PenStyle::Dash => wingdi::PS_DASH,
+                PenStyle::Dot => wingdi::PS_DOT,
+                PenStyle::DashDot => wingdi::PS_DASHDOT,
+                PenStyle::DashDotDot => wingdi::PS_DASHDOTDOT,
+                PenStyle::Null => wingdi::PS_NULL,
+                PenStyle::InsideFrame => wingdi::PS_INSIDEFRAME,
+            };
+            let hpen = unsafe { wingdi::CreatePen(style as _, width, color.colorref()) };
+            let hpen = match NonNull::new(hpen) {
+                Some(hpen) => hpen,
+                None => return Err(crate::Error::win32_error(Some("CreatePen"))),
+            };
+            let hpen = window_data.provider.borrow_mut().create_key(
+                hpen.cast(),
+                KeyType::GdiObject,
+                true,
+            )?;
+            Ok(Response::Key(hpen))
+        }
         _ => Ok(Response::Empty),
     }
 }
@@ -351,10 +399,9 @@ fn create_window(
     // increment the window count. we set up the GUI thread loop to exit if the window count
     // reaches zero during a wait cycle, and the window decrements the count when it is
     // destroyed
-    let mut ex = window_data.exclusive.borrow_mut();
-    ex.window_count += 1;
-    log::debug!("Window count is now {}", ex.window_count);
-    mem::drop(ex);
+    let window_count = window_data.window_count.get().checked_add(1).expect("More than usize::MAX windows have been created. This is likely the programmer forgetting to destroy windows.");
+    window_data.window_count.set(window_count);
+    log::debug!("Window count is now {}", window_count);
 
     let mut provider = window_data.provider.borrow_mut();
     let parent = match parent {
@@ -385,7 +432,7 @@ fn create_window(
 
     match NonNull::new(res) {
         None => Err(crate::Error::win32_error(Some("CreateWindowExA"))),
-        Some(res) => Ok(Response::Window(provider.create_key(
+        Some(res) => Ok(Response::Key(provider.create_key(
             res.cast(),
             KeyType::Window,
             false,

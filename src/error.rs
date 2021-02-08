@@ -20,6 +20,7 @@ pub enum Error {
         description: CString,
         calling_function: Option<&'static str>,
     },
+    HandlerChangedDuringEvent,
     ErrorFailed,
 }
 
@@ -35,6 +36,9 @@ impl fmt::Display for Error {
             }
             Self::TypeMismatch => {
                 f.write_str("Attempted to use an improper pointer key for a value")
+            }
+            Self::HandlerChangedDuringEvent => {
+                f.write_str("Attempted to change event handler during an event")
             }
             Self::Win32Error {
                 code,
