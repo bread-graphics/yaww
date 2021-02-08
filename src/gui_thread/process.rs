@@ -97,12 +97,11 @@ pub(crate) fn process_directive(
             let dc = window_data.provider.borrow_mut().translate(dc)?;
             let res_dc = unsafe { wingdi::CreateCompatibleDC(dc.cast().as_ptr()) };
             match NonNull::new(res_dc) {
-                Some(res_dc) => Ok(Response::Dc(
-                    window_data
-                        .provider
-                        .borrow_mut()
-                        .create_key(res_dc.cast(), KeyType::Dc, false)?,
-                )),
+                Some(res_dc) => Ok(Response::Dc(window_data.provider.borrow_mut().create_key(
+                    res_dc.cast(),
+                    KeyType::Dc,
+                    false,
+                )?)),
                 None => Err(crate::Error::win32_error(Some("CreateCompatibleDc"))),
             }
         }

@@ -194,6 +194,8 @@ pub enum Directive {
     BeginWait,
     #[doc(hidden)]
     Dummy,
+    #[doc(hidden)]
+    DeferEventProcessing,
 }
 // TODO: fmt::debug
 
@@ -214,7 +216,7 @@ impl Directive {
             | Self::Bezier { .. }
             | Self::Polygon { .. }
             | Self::BitBlt { .. }
-            | Self::Dummy => true,
+            | Self::Dummy | Self::DeferEventProcessing => true,
             _ => false,
         }
     }

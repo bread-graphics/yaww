@@ -14,7 +14,8 @@ impl GdiObject {
     #[cfg(feature = "async")]
     #[inline]
     pub async fn delete_async(self, gt: &GuiThread) -> crate::Result {
-        gt.send_directive_async(Directive::DeleteObject(self)).await?;
+        gt.send_directive_async(Directive::DeleteObject(self))
+            .await?;
         Ok(())
     }
 }

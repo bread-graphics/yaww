@@ -7,6 +7,7 @@ use crate::{
     refcell::RefCell,
     window::Window,
 };
+use crossbeam_utils::thread;
 use event_listener::Event as LEvent;
 use flume::{Receiver, Sender};
 use std::{
@@ -17,6 +18,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, Condvar, Mutex,
     },
+    cell::Cell,
 };
 use winapi::{
     shared::{
@@ -33,20 +35,19 @@ pub(crate) struct DirectiveLock {
     pub done_processing: LEvent,
 }
 
-/// Data within the WindowData that demands exclusive access.
-pub(crate) struct WindowDataExclusive {
-    // event handler
-    pub event_handler: Box<dyn FnMut(Event) -> crate::Result + Send + 'static>,
-    // the current number of windows
-    pub window_count: usize,
-    // are we in a wait cycle?
-    pub waiting: bool,
-}
-
 /// Data we expect to be available to every window.
 pub(crate) struct WindowData {
-    pub exclusive: RefCell<WindowDataExclusive>,
+    // translates keys to win32 pointers. we make sure this is never reentrant
     pub provider: RefCell<Provider>,
+
+    // the event handler. this needs to be an Fn() instead of an FnMut(), since the event handling process
+    // can sometimes be reentrant.
+    pub event_handler: Box<dyn Fn(Event) -> crate::Result + Send + 'static>,
+
+    // the current number of windows
+    pub window_count: Cell<usize>,
+    // are we in a wait cycle?
+    pub waiting: Cell<bool>,
 
     // tell the directive processing thread to not process any directives until we're
     // done
@@ -143,13 +144,13 @@ fn wndproc_inner(
             window_data.provider.borrow_mut().remove_key(hwnd.cast());
 
             // decrement the window count
-            let mut window_data = window_data.exclusive.borrow_mut();
-            window_data.window_count = window_data.window_count.saturating_sub(1);
-            log::debug!("Window count is now {}", window_data.window_count);
+            let window_count = window_data.window_count.get().saturating_sub(1);
+            window_data.window_count.set(window_count);
+            log::debug!("Window count is now {}", window_count);
 
             // if the window count has reached zero and we're in a wait cycle (read: there are no
             // more directives to the sent to the loop), send the quit message to the loop
-            if window_data.waiting && window_data.window_count == 0 {
+            if window_data.waiting.get() && window_count == 0 {
                 log::debug!("Posting quit message into queue");
                 unsafe { PostQuitMessage(0) };
                 return Some(0);
@@ -267,17 +268,30 @@ fn use_event_loop(window_data: &WindowData, event: Event) {
     }
 
     // now that we have control over the directives, run our event handler
-    let mut ex = window_data.exclusive.borrow_mut();
-    if (ex.event_handler)(event).is_err() {
-        unreachable!("TODO: handle errors");
-    }
+    // note that we need to run it in a separate thread, since we're doing event processing on this thread
+    // and we don't want to block unless we have to
+    // to this end, clone the directive sender so we can send the DeferEventProcessing directive and stop
+    // the loop below
+    // note: &mut FnMut() + Send is Send
+    let event_handler = &mut ex.event_handler;
+    let directive_send = window_data.directive_send.clone();
 
-    // the event handler may have generated directives for us to process, so process them
-    mem::drop(ex);
-    window_data
-        .recv
-        .try_iter()
-        .for_each(|dir| handle_directive_processing(dir, window_data));
+    // spawn a scoped thread, so we can borrow variables from the stack
+    thread::scope(move |s| {
+        let handle = s.builder().name("yaww-event-handler".to_string()).spawn(move |_| {
+            if (event_handler)(event).is_err() {
+               unreachable!("TODO: handle errors");
+            }
+            directive_send.send(Directive::DeferEventProcessing).unwrap();
+        });
+
+        // the event handler may have generated directives for us to process, so process them
+        mem::drop(ex);
+        window_data
+            .recv
+            .try_iter()
+            .for_each(|dir| handle_directive_processing(dir, window_data));
+    });
 
     // tell the directive processing thread to start processing events again
     window_data

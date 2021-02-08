@@ -2,15 +2,17 @@
 
 use std::{ffi::CStr, ops, os::raw::c_char};
 use yaww::{
-    window::{ClassStyle, ExtendedWindowStyle, WindowStyle, ShowWindowCommand},
-    GuiThread, Result,
+    window::{ClassStyle, ExtendedWindowStyle, ShowWindowCommand, WindowStyle},
+    Event, GuiThread, Result,
 };
 
 const CLASS_NAME: ConstCstr<'static> = ConstCstr::new(&*b"examples_basic_class\0");
 const WINDOW_NAME: ConstCstr<'static> = ConstCstr::new(&*b"YAWW Example\0");
 
 fn main() -> Result {
-    env_logger::Builder::new().filter(Some("yaww"), log::LevelFilter::Debug).init();
+    env_logger::Builder::new()
+        .filter(Some("yaww"), log::LevelFilter::Debug)
+        .init();
 
     let gui_thread = GuiThread::new();
     gui_thread.register_class(
@@ -35,7 +37,20 @@ fn main() -> Result {
         None,
     )?;
     window.show(&gui_thread, ShowWindowCommand::SHOW)?;
-    gui_thread.set_event_handler(|ev| { println!("{:?}", ev); Ok(()) })?;
+
+    let gt_clone = gui_thread.clone();
+    gui_thread.set_event_handler(move |ev| {
+        println!("{:?}", &ev);
+        match ev {
+            Event::Paint { dc, .. } => {
+                dc.move_to(&gt_clone, 200, 200)?;
+                dc.line_to(&gt_clone, 300, 400)?;
+            }
+            _ => (),
+        }
+
+        Ok(())
+    })?;
 
     gui_thread.wait()?;
 
