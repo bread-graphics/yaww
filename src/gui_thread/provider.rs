@@ -48,6 +48,7 @@ pub(crate) enum KeyType {
     Cursor,
     Menu,
     Dc,
+    GdiObject,
 }
 
 /// Provides matches between data keys and data.
@@ -71,21 +72,28 @@ impl Provider {
     }
 
     #[inline]
-    pub fn create_key(&mut self, pointer: NonNull<()>, ty: KeyType) -> crate::Result<Key> {
+    pub fn create_key(
+        &mut self,
+        pointer: NonNull<()>,
+        ty: KeyType,
+        replace: bool,
+    ) -> crate::Result<Key> {
         #[cfg(debug_assertions)]
         {
             let key = unsafe { NonZeroUsize::new_unchecked(pointer.as_ptr() as usize) };
             if let Some(old_value) = self.type_map.insert(key, ty) {
-                self.type_map.insert(key, old_value);
-                Err(crate::Error::PtrAlreadyExists)
-            } else {
-                Ok(Key { key, ty })
+                if !replace {
+                    self.type_map.insert(key, old_value);
+                    return Err(crate::Error::PtrAlreadyExists);
+                }
             }
+
+            Ok(Key { key, ty })
         }
 
         #[cfg(not(debug_assertions))]
         {
-            let _ = ty;
+            let _ = (ty, replace);
             Ok(Key {
                 key: unsafe { NonZeroUsize::new_unchecked(pointer.as_ptr() as usize) },
             })

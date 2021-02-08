@@ -2,7 +2,7 @@
 
 //! Process a message into a directive.
 
-use super::{Directive, KeyType, Provider, Response};
+use super::{Directive, KeyType, Provider, RasterOperation, Response};
 use crate::{
     brush::Brush,
     cursor::Cursor,
@@ -20,7 +20,7 @@ use std::{
 use winapi::{
     ctypes::c_int,
     shared::minwindef::BOOL,
-    um::{libloaderapi, winuser},
+    um::{libloaderapi, wingdi, winuser},
 };
 
 #[inline]
@@ -87,6 +87,186 @@ pub(crate) fn process_directive(
             repaint,
         } => move_window(window_data, window, x, y, width, height, repaint),
         Directive::ShowWindow { window, command } => show_window(window_data, window, command),
+        Directive::DeleteObject(obj) => {
+            let obj = window_data.provider.borrow_mut().translate(obj)?;
+            unsafe { wingdi::DeleteObject(obj.cast().as_ptr()) };
+            window_data.provider.borrow_mut().remove_key(obj);
+            Ok(Response::Empty)
+        }
+        Directive::CreateCompatibleDc(dc) => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            let res_dc = unsafe { wingdi::CreateCompatibleDC(dc.cast().as_ptr()) };
+            match NonNull::new(res_dc) {
+                Some(res_dc) => Ok(Response::Dc(
+                    window_data
+                        .provider
+                        .borrow_mut()
+                        .create_key(res_dc.cast(), KeyType::Dc, false)?,
+                )),
+                None => Err(crate::Error::win32_error(Some("CreateCompatibleDc"))),
+            }
+        }
+        Directive::DeleteDc(dc) => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe { wingdi::DeleteDC(dc.cast().as_ptr()) };
+            Ok(Response::Empty)
+        }
+        Directive::SelectObject { dc, object } => {
+            let mut provider = window_data.provider.borrow_mut();
+            let dc = provider.translate(dc)?;
+            let obj = provider.translate(object)?;
+            mem::drop(provider);
+
+            let res_obj = unsafe { wingdi::SelectObject(dc.cast().as_ptr(), obj.cast().as_ptr()) };
+            let res_obj = match NonNull::new(res_obj) {
+                Some(res_obj) => window_data
+                    .provider
+                    .borrow_mut()
+                    .create_key(res_obj.cast(), KeyType::GdiObject, true)
+                    .unwrap(),
+
+                None => return Err(crate::Error::win32_error(Some("SelectObject"))),
+            };
+
+            Ok(Response::GdiObject(res_obj))
+        }
+        Directive::SetPixel { dc, x, y, color } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe { wingdi::SetPixel(dc.cast().as_ptr(), x, y, color.colorref()) };
+            Ok(Response::Empty)
+        }
+        Directive::MoveTo { dc, x, y } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe { wingdi::MoveToEx(dc.cast().as_ptr(), x, y, ptr::null_mut()) };
+            Ok(Response::Empty)
+        }
+        Directive::LineTo { dc, x, y } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe { wingdi::LineTo(dc.cast().as_ptr(), x, y) };
+            Ok(Response::Empty)
+        }
+        Directive::Rectangle {
+            dc,
+            left,
+            top,
+            right,
+            bottom,
+        } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe { wingdi::Rectangle(dc.cast().as_ptr(), left, top, right, bottom) };
+            Ok(Response::Empty)
+        }
+        Directive::Bezier { dc, points } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe { wingdi::PolyBezier(dc.cast().as_ptr(), points.as_ptr(), points.len() as _) };
+            Ok(Response::Empty)
+        }
+        Directive::Polygon { dc, points } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe { wingdi::Polygon(dc.cast().as_ptr(), points.as_ptr(), points.len() as _) };
+            Ok(Response::Empty)
+        }
+        Directive::Polyline { dc, points } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe { wingdi::Polyline(dc.cast().as_ptr(), points.as_ptr(), points.len() as _) };
+            Ok(Response::Empty)
+        }
+        Directive::Ellipse {
+            dc,
+            left,
+            top,
+            right,
+            bottom,
+        } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe { wingdi::Ellipse(dc.cast().as_ptr(), left, top, right, bottom) };
+            Ok(Response::Empty)
+        }
+        Directive::RoundRect {
+            dc,
+            left,
+            top,
+            right,
+            bottom,
+            ellipse_width,
+            ellipse_height,
+        } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe {
+                wingdi::RoundRect(
+                    dc.cast().as_ptr(),
+                    left,
+                    top,
+                    right,
+                    bottom,
+                    ellipse_width,
+                    ellipse_height,
+                )
+            };
+            Ok(Response::Empty)
+        }
+        Directive::Chord {
+            dc,
+            rect_left,
+            rect_top,
+            rect_right,
+            rect_bottom,
+            line_x1,
+            line_y1,
+            line_x2,
+            line_y2,
+        } => {
+            let dc = window_data.provider.borrow_mut().translate(dc)?;
+            unsafe {
+                wingdi::Chord(
+                    dc.cast().as_ptr(),
+                    rect_left,
+                    rect_top,
+                    rect_right - rect_left,
+                    rect_bottom - rect_top,
+                    line_x1,
+                    line_y1,
+                    line_x2,
+                    line_y2,
+                )
+            };
+            Ok(Response::Empty)
+        }
+        Directive::BitBlt {
+            src,
+            dest,
+            srcx,
+            srcy,
+            destx,
+            desty,
+            width,
+            height,
+            op,
+        } => {
+            let mut provider = window_data.provider.borrow_mut();
+            let src = provider.translate(src)?;
+            let dest = provider.translate(dest)?;
+            mem::drop(provider);
+
+            let op = match op {
+                RasterOperation::SrcCopy => wingdi::SRCCOPY,
+            };
+
+            unsafe {
+                wingdi::BitBlt(
+                    dest.cast().as_ptr(),
+                    destx,
+                    desty,
+                    width,
+                    height,
+                    src.cast().as_ptr(),
+                    srcx,
+                    srcy,
+                    op,
+                )
+            };
+            Ok(Response::Empty)
+        }
         _ => Ok(Response::Empty),
     }
 }
@@ -206,9 +386,11 @@ fn create_window(
 
     match NonNull::new(res) {
         None => Err(crate::Error::win32_error(Some("CreateWindowExA"))),
-        Some(res) => Ok(Response::Window(
-            provider.create_key(res.cast(), KeyType::Window)?,
-        )),
+        Some(res) => Ok(Response::Window(provider.create_key(
+            res.cast(),
+            KeyType::Window,
+            false,
+        )?)),
     }
 }
 

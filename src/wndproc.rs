@@ -237,7 +237,7 @@ fn wndproc_inner(
             let drawer = window_data
                 .provider
                 .borrow_mut()
-                .create_key(hdc.cast(), KeyType::Dc)
+                .create_key(hdc.cast(), KeyType::Dc, false)
                 .unwrap();
             use_event_loop(window_data, Event::Paint { window, dc: drawer });
             window_data.provider.borrow_mut().remove_key(hdc.cast());
