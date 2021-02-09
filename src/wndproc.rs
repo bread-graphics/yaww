@@ -13,13 +13,14 @@ use std::{
     cell::Cell,
     mem::{self, MaybeUninit},
     panic,
-    ptr::NonNull,
+    ptr::{self, NonNull},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Condvar, Mutex,
     },
     thread,
 };
+use winapi::um::wingdi;
 use winapi::{
     shared::{
         minwindef::{HIWORD, LOWORD, LPARAM, LRESULT, UINT, WPARAM},
@@ -237,7 +238,10 @@ fn wndproc_inner(
             let hdc = match NonNull::new(hdc) {
                 Some(hdc) => hdc,
                 // we can't do anything with a null dc, just return if this is the case
-                None => return Some(0),
+                None => {
+                    log::error!("Got a null DC from BeginPaint");
+                    return Some(0);
+                }
             };
 
             // convert the HDC to a key

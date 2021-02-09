@@ -2,7 +2,7 @@
 
 //! Process a message into a directive.
 
-use super::{Directive, KeyType, Point, Provider, RasterOperation, Response};
+use super::{Directive, KeyType, Point, Provider, RasterOperation, Rect, Response};
 use crate::{
     brush::Brush,
     cursor::Cursor,
@@ -21,9 +21,20 @@ use std::{
 };
 use winapi::{
     ctypes::c_int,
-    shared::{minwindef::BOOL, windef::POINT},
+    shared::{
+        minwindef::BOOL,
+        windef::{POINT, RECT},
+    },
     um::{libloaderapi, wingdi, winuser},
 };
+
+macro_rules! win32_try {
+    ($e: expr, $name: expr) => {
+        if unsafe { $e } == 0 {
+            return Err(crate::Error::win32_error(Some($name)));
+        }
+    };
+}
 
 #[inline]
 pub(crate) fn process_directive(
@@ -89,6 +100,28 @@ pub(crate) fn process_directive(
             repaint,
         } => move_window(window_data, window, x, y, width, height, repaint),
         Directive::ShowWindow { window, command } => show_window(window_data, window, command),
+        Directive::InvalidateRect {
+            window,
+            rect,
+            erase,
+        } => {
+            let window = window_data.provider.borrow_mut().translate(window)?;
+            if unsafe {
+                winuser::InvalidateRect(
+                    window.cast().as_ptr(),
+                    match &rect {
+                        Some(rect) => rect as *const Rect as *const RECT,
+                        None => ptr::null(),
+                    },
+                    if erase { 1 } else { 0 },
+                )
+            } == 0
+            {
+                Err(crate::Error::win32_error(None))
+            } else {
+                Ok(Response::Empty)
+            }
+        }
         Directive::DeleteObject(obj) => {
             let obj = window_data.provider.borrow_mut().translate(obj)?;
             unsafe { wingdi::DeleteObject(obj.cast().as_ptr()) };
@@ -140,12 +173,15 @@ pub(crate) fn process_directive(
         }
         Directive::MoveTo { dc, x, y } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe { wingdi::MoveToEx(dc.cast().as_ptr(), x, y, ptr::null_mut()) };
+            win32_try!(
+                wingdi::MoveToEx(dc.cast().as_ptr(), x, y, ptr::null_mut()),
+                "MoveToEx"
+            );
             Ok(Response::Empty)
         }
         Directive::LineTo { dc, x, y } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe { wingdi::LineTo(dc.cast().as_ptr(), x, y) };
+            win32_try!(wingdi::LineTo(dc.cast().as_ptr(), x, y), "LineTo");
             Ok(Response::Empty)
         }
         Directive::Rectangle {
@@ -156,40 +192,46 @@ pub(crate) fn process_directive(
             bottom,
         } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe { wingdi::Rectangle(dc.cast().as_ptr(), left, top, right, bottom) };
+            win32_try!(
+                wingdi::Rectangle(dc.cast().as_ptr(), left, top, right, bottom),
+                "Rectangle"
+            );
             Ok(Response::Empty)
         }
         Directive::Bezier { dc, points } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe {
+            win32_try!(
                 wingdi::PolyBezier(
                     dc.cast().as_ptr(),
                     points.as_ptr() as *const Point as *const POINT,
                     points.len() as _,
-                )
-            };
+                ),
+                "PolyBezier"
+            );
             Ok(Response::Empty)
         }
         Directive::Polygon { dc, points } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe {
+            win32_try!(
                 wingdi::Polygon(
                     dc.cast().as_ptr(),
                     points.as_ptr() as *const Point as *const POINT,
                     points.len() as _,
-                )
-            };
+                ),
+                "Polygon"
+            );
             Ok(Response::Empty)
         }
         Directive::Polyline { dc, points } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe {
+            win32_try!(
                 wingdi::Polyline(
                     dc.cast().as_ptr(),
                     points.as_ptr() as *const Point as *const POINT,
                     points.len() as _,
-                )
-            };
+                ),
+                "Polyline"
+            );
             Ok(Response::Empty)
         }
         Directive::Ellipse {
@@ -200,7 +242,10 @@ pub(crate) fn process_directive(
             bottom,
         } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe { wingdi::Ellipse(dc.cast().as_ptr(), left, top, right, bottom) };
+            win32_try!(
+                wingdi::Ellipse(dc.cast().as_ptr(), left, top, right, bottom),
+                "Ellipse"
+            );
             Ok(Response::Empty)
         }
         Directive::RoundRect {
@@ -213,7 +258,7 @@ pub(crate) fn process_directive(
             ellipse_height,
         } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe {
+            win32_try!(
                 wingdi::RoundRect(
                     dc.cast().as_ptr(),
                     left,
@@ -222,8 +267,9 @@ pub(crate) fn process_directive(
                     bottom,
                     ellipse_width,
                     ellipse_height,
-                )
-            };
+                ),
+                "RoundRect"
+            );
             Ok(Response::Empty)
         }
         Directive::Chord {
@@ -238,7 +284,7 @@ pub(crate) fn process_directive(
             line_y2,
         } => {
             let dc = window_data.provider.borrow_mut().translate(dc)?;
-            unsafe {
+            win32_try!(
                 wingdi::Chord(
                     dc.cast().as_ptr(),
                     rect_left,
@@ -249,8 +295,9 @@ pub(crate) fn process_directive(
                     line_y1,
                     line_x2,
                     line_y2,
-                )
-            };
+                ),
+                "Chord"
+            );
             Ok(Response::Empty)
         }
         Directive::BitBlt {
@@ -273,7 +320,7 @@ pub(crate) fn process_directive(
                 RasterOperation::SrcCopy => wingdi::SRCCOPY,
             };
 
-            unsafe {
+            win32_try!(
                 wingdi::BitBlt(
                     dest.cast().as_ptr(),
                     destx,
@@ -284,8 +331,9 @@ pub(crate) fn process_directive(
                     srcx,
                     srcy,
                     op,
-                )
-            };
+                ),
+                "BitBlt"
+            );
             Ok(Response::Empty)
         }
         Directive::CreatePen {
@@ -313,6 +361,19 @@ pub(crate) fn process_directive(
                 true,
             )?;
             Ok(Response::Key(hpen))
+        }
+        Directive::CreateSolidBrush(color) => {
+            let hbrush = unsafe { wingdi::CreateSolidBrush(color.colorref()) };
+            let hbrush = match NonNull::new(hbrush) {
+                Some(hbrush) => hbrush,
+                None => return Err(crate::Error::win32_error(Some("CreateSolidBrush"))),
+            };
+            let hbrush = window_data.provider.borrow_mut().create_key(
+                hbrush.cast(),
+                KeyType::GdiObject,
+                true,
+            )?;
+            Ok(Response::Key(hbrush))
         }
         _ => Ok(Response::Empty),
     }

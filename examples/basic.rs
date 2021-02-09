@@ -38,21 +38,33 @@ fn main() -> Result {
     )?;
     window.show(&gui_thread, ShowWindowCommand::SHOW)?;
 
-    // create a pen
-    let pen = gui_thread.create_pen(PenStyle::Solid, 50, Color::from_rgb(0, 0, 0))?;
-
     let gt_clone = gui_thread.clone();
     gui_thread.set_event_handler(move |ev| {
         println!("{:?}", &ev);
         match ev {
             Event::Paint { dc, .. } => {
+                // create a pen
+                let pen = gt_clone.create_pen(PenStyle::Dash, 50, Color::from_rgb(0, 0, 0))?;
+                let brush = gt_clone.create_solid_brush(Color::from_rgb(255, 0, 0))?;
+
                 let hold_pen = dc.select_object(&gt_clone, pen)?;
-                dc.move_to(&gt_clone, 200, 200)?;
-                dc.line_to(&gt_clone, 300, 400)?;
+                let hold_brush = dc.select_object(&gt_clone, brush)?;
+                //dc.move_to(&gt_clone, 0, 0)?;
+                //dc.line_to(&gt_clone, 600, 400)?;
+                //dc.rectangle(&gt_clone, 30, 30, 300, 300)?;
+                for _ in 0..100 {
+                    dc.set_pixel(
+                        &gt_clone,
+                        fastrand::i32(0..600),
+                        fastrand::i32(0..400),
+                        Color::from_rgb(0, 0, 0),
+                    )?;
+                }
                 dc.select_object(&gt_clone, hold_pen)?;
-            }
-            Event::Quit => {
+                dc.select_object(&gt_clone, hold_brush)?;
+
                 pen.delete(&gt_clone)?;
+                brush.delete(&gt_clone)?;
             }
             _ => (),
         }
@@ -60,6 +72,7 @@ fn main() -> Result {
         Ok(())
     })?;
 
+    window.invalidate_rect(&gui_thread, None, true)?;
     gui_thread.wait()?;
 
     Ok(())

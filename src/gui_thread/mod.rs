@@ -39,7 +39,7 @@ mod provider;
 mod thread;
 
 pub use message::{
-    DebugContainer, Directive, Event, Point, RasterOperation, Response, SpecialResize,
+    DebugContainer, Directive, Event, Point, RasterOperation, Rect, Response, SpecialResize,
 };
 pub(crate) use process::process_directive;
 pub use provider::Key;

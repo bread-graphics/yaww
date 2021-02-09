@@ -40,6 +40,15 @@ pub struct Point {
     pub y: LONG,
 }
 
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(C)]
+pub struct Rect {
+    pub left: LONG,
+    pub top: LONG,
+    pub right: LONG,
+    pub bottom: LONG,
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DebugContainer<T>(pub T);
 
@@ -126,6 +135,11 @@ pub enum Directive {
         width: c_int,
         height: c_int,
         repaint: bool,
+    },
+    InvalidateRect {
+        window: Window,
+        rect: Option<Rect>,
+        erase: bool,
     },
 
     // gdi object functions
@@ -218,6 +232,9 @@ pub enum Directive {
         width: c_int,
         color: Color,
     },
+
+    // brush function
+    CreateSolidBrush(Color),
 
     // bitmap functions
     GetBitmapInfo(Bitmap),

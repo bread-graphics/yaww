@@ -1,7 +1,7 @@
 // MIT/Apache2 License
 
 use crate::{
-    gui_thread::{Directive, GuiThread, Key},
+    gui_thread::{Directive, GuiThread, Key, Rect},
     menu::Menu,
 };
 use std::{borrow::Cow, ffi::CStr};
@@ -229,6 +229,35 @@ impl Window {
             width,
             height,
             repaint,
+        })
+        .await?;
+        Ok(())
+    }
+
+    /// Invalidate this window, forcing a repaint.
+    #[inline]
+    pub fn invalidate_rect(self, gt: &GuiThread, rect: Option<Rect>, erase: bool) -> crate::Result {
+        gt.send_directive(Directive::InvalidateRect {
+            window: self,
+            rect,
+            erase,
+        })?;
+        Ok(())
+    }
+
+    /// Invalidate this window, forcing a repaint, async redox.
+    #[cfg(feature = "async")]
+    #[inline]
+    pub async fn invalidate_rect_async(
+        self,
+        gt: &GuiThread,
+        rect: Option<Rect>,
+        erase: bool,
+    ) -> crate::Result {
+        gt.send_directive_async(Directive::InvalidateRect {
+            window: self,
+            rect,
+            erase,
         })
         .await?;
         Ok(())
