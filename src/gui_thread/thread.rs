@@ -43,8 +43,10 @@ pub(crate) fn create(
         .name(format!("yaww-gui-thread-{}", index))
         .spawn(move || {
             let directive_lock = Arc::new(DirectiveLock {
-                relax_directive_thread: AtomicBool::new(false),
+                is_done_processing: AtomicBool::new(false),
                 done_processing: LEvent::new(),
+                is_directive_thread_relaxed: AtomicBool::new(false),
+                directive_thread_relaxed: LEvent::new(),
             });
 
             // window data contains data that we need to pass to the wndproc and also to the directive handler
@@ -75,14 +77,51 @@ pub(crate) fn create(
                 .name(format!("yaww-gui-thread-recv-{}", index))
                 .spawn(move || {
                     loop {
-                        if directive_lock.relax_directive_thread.load(Ordering::SeqCst) {
-                            directive_lock.done_processing.listen().wait();
-                            continue;
-                        }
-
                         let directive = match recv.recv() {
                             // dummy directives are used to flush the loop
-                            Ok(Directive::Dummy) => continue,
+                            Ok(Directive::RelaxDirectiveThread) => {
+                                // acknowledge the main thread's power
+                                directive_lock
+                                    .is_directive_thread_relaxed
+                                    .store(true, Ordering::SeqCst);
+                                directive_lock
+                                    .directive_thread_relaxed
+                                    .notify(std::usize::MAX);
+
+                                loop {
+                                    if directive_lock
+                                        .is_done_processing
+                                        .compare_exchange(
+                                            true,
+                                            false,
+                                            Ordering::SeqCst,
+                                            Ordering::SeqCst,
+                                        )
+                                        .is_ok()
+                                    {
+                                        break;
+                                    }
+
+                                    let listener = directive_lock.done_processing.listen();
+
+                                    if directive_lock
+                                        .is_done_processing
+                                        .compare_exchange(
+                                            true,
+                                            false,
+                                            Ordering::SeqCst,
+                                            Ordering::SeqCst,
+                                        )
+                                        .is_ok()
+                                    {
+                                        break;
+                                    }
+
+                                    listener.wait();
+                                }
+
+                                continue;
+                            }
                             Ok(directive) => directive,
                             // if it's failed, just quit the thread
                             Err(_) => return,

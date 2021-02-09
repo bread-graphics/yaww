@@ -1,0 +1,40 @@
+002c:fixme:winediag:LdrInitializeThunk wine-staging 6.1 is a testing version containing experimental patches.
+002c:fixme:winediag:LdrInitializeThunk Please mention your exact version when filing bug reports on winehq.org.
+002c:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+002c:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0034:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0034:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0068:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0068:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0080:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0080:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+INTEL-MESA: warning: Performance support disabled, consider sysctl dev.i915.perf_stream_paranoid=0
+
+00c4:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+00c4:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0108:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0108:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0110:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+0110:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+[DEBUG yaww::gui_thread::process] Received directive: RegisterClass { class_name: "examples_basic_class", style: (empty), icon: None, small_icon: None, cursor: None, background: None, menu_name: None }
+[DEBUG yaww::gui_thread::process] Received directive: CreateWindow { class_name: "examples_basic_class", window_name: "YAWW Example", style: BORDER | CAPTION | DLG_FRAME | GROUP | MAXIMIZE_BOX | MINMIZE_BOX | OVERLAPPED_WINDOW | SIZE_BOX | SYS_MENU | TAB_SETOP | THICK_FRAME | TILED_WINDOW, extended_style: LEFT | LTR_READING | RIGHT_SCROLL_BAR, x: 0, y: 0, width: 640, height: 400, parent: None, menu: None }
+[DEBUG yaww::gui_thread::process] Window count is now 1
+[DEBUG yaww::gui_thread::process] Received directive: ShowWindow { window: Key { key: 131150, ty: Window }, command: SHOW | SHOW_NO_ACTIVATE | SHOW_NORMAL }
+[WARN  yaww::gui_thread::thread] Event ignored: Activate { window: Key { key: 131150, ty: Window }, from_mouse_click: false }
+[WARN  yaww::gui_thread::thread] Event ignored: SetFocus(Key { key: 131150, ty: Window })
+[WARN  yaww::gui_thread::thread] Event ignored: Size { window: Key { key: 131150, ty: Window }, width: 632, height: 373, special: None }
+[WARN  yaww::gui_thread::thread] Event ignored: Move { window: Key { key: 131150, ty: Window }, x: 4, y: 23 }
+[WARN  yaww::gui_thread::thread] Event ignored: Paint { window: Key { key: 131150, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: CreatePen { style: Solid, width: 50, color: Color { inner: 0 } }
+[WARN  yaww::gui_thread::thread] Event ignored: Move { window: Key { key: 131150, ty: Window }, x: 72, y: 64 }
+[DEBUG yaww::gui_thread::process] Received directive: SetEventHandler(<cannot format>)
+[DEBUG yaww::gui_thread::thread] Beginning wait cycle...
+Close(Key { key: 131150, ty: Window })
+Deactivate(Key { key: 131150, ty: Window })
+KillFocus(Key { key: 131150, ty: Window })
+[DEBUG yaww::wndproc] Window count is now 0
+[DEBUG yaww::wndproc] Posting quit message into queue
+Quit
+[DEBUG yaww::gui_thread::process] Received directive: DeleteObject(Key { key: 786500, ty: GdiObject })
+[INFO  yaww::gui_thread::thread] Leaving GUI thread main loop...
+00a4:err:rpc:I_RpcReceive we got fault packet with status 0x1c010003

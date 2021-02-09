@@ -31,8 +31,10 @@ use winapi::{
 /// A "lock" on the event receiving system.
 /// TODO: there's probably a better way of doing this.
 pub(crate) struct DirectiveLock {
-    pub relax_directive_thread: AtomicBool,
+    pub is_done_processing: AtomicBool,
     pub done_processing: LEvent,
+    pub is_directive_thread_relaxed: AtomicBool,
+    pub directive_thread_relaxed: LEvent,
 }
 
 /// Data we expect to be available to every window.
@@ -262,13 +264,38 @@ fn wndproc_inner(
 #[inline]
 fn use_event_loop(window_data: &WindowData, event: Event) {
     // first, tell the directive processing thread to relax
-    window_data
-        .directive_lock
-        .relax_directive_thread
-        .store(true, Ordering::SeqCst);
-    if window_data.directive_send.send(Directive::Dummy).is_err() {
+    if window_data
+        .directive_send
+        .send(Directive::RelaxDirectiveThread)
+        .is_err()
+    {
         log::error!("Directive thread is closed!");
         panic!("If the directive thread is closed down, then it's probably panicked");
+    }
+
+    // wait until the directive thread acknowledges our power
+    loop {
+        if window_data
+            .directive_lock
+            .is_directive_thread_relaxed
+            .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            break;
+        }
+
+        let listener = window_data.directive_lock.directive_thread_relaxed.listen();
+
+        if window_data
+            .directive_lock
+            .is_directive_thread_relaxed
+            .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            break;
+        }
+
+        listener.wait();
     }
 
     // now that we have control over the directives, run our event handler
@@ -311,10 +338,10 @@ fn use_event_loop(window_data: &WindowData, event: Event) {
     // tell the directive processing thread to start processing events again
     window_data
         .directive_lock
-        .relax_directive_thread
-        .store(false, Ordering::SeqCst);
+        .is_done_processing
+        .store(true, Ordering::SeqCst);
     window_data
         .directive_lock
         .done_processing
-        .notify_additional(1);
+        .notify(std::usize::MAX);
 }

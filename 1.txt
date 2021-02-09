@@ -1,0 +1,411 @@
+039c:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+039c:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+03a4:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+03a4:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+03b4:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+03b4:fixme:font:get_name_record_codepage encoding 20 not handled, platform 1.
+[DEBUG yaww::gui_thread::process] Received directive: RegisterClass { class_name: "examples_basic_class", style: (empty), icon: None, small_icon: None, cursor: None, background: None, menu_name: None }
+[DEBUG yaww::gui_thread::process] Received directive: CreateWindow { class_name: "examples_basic_class", window_name: "YAWW Example", style: BORDER | CAPTION | DLG_FRAME | GROUP | MAXIMIZE_BOX | MINMIZE_BOX | OVERLAPPED_WINDOW | SIZE_BOX | SYS_MENU | TAB_SETOP | THICK_FRAME | TILED_WINDOW, extended_style: LEFT | LTR_READING | RIGHT_SCROLL_BAR, x: 0, y: 0, width: 640, height: 400, parent: None, menu: None }
+[DEBUG yaww::gui_thread::process] Window count is now 1
+[DEBUG yaww::gui_thread::process] Received directive: ShowWindow { window: Key { key: 524322, ty: Window }, command: SHOW | SHOW_NO_ACTIVATE | SHOW_NORMAL }
+[WARN  yaww::gui_thread::thread] Event ignored: Activate { window: Key { key: 524322, ty: Window }, from_mouse_click: false }
+[WARN  yaww::gui_thread::thread] Event ignored: SetFocus(Key { key: 524322, ty: Window })
+[WARN  yaww::gui_thread::thread] Event ignored: Size { window: Key { key: 524322, ty: Window }, width: 632, height: 373, special: None }
+[WARN  yaww::gui_thread::thread] Event ignored: Move { window: Key { key: 524322, ty: Window }, x: 4, y: 23 }
+[WARN  yaww::gui_thread::thread] Event ignored: Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: CreatePen { style: Solid, width: 50, color: Color { inner: 0 } }
+[DEBUG yaww::gui_thread::process] Received directive: SetEventHandler(<cannot format>)
+Move { window: Key { key: 524322, ty: Window }, x: 72, y: 64 }
+[DEBUG yaww::gui_thread::thread] Beginning wait cycle...
+Move { window: Key { key: 524322, ty: Window }, x: 103, y: 83 }
+Move { window: Key { key: 524322, ty: Window }, x: 138, y: 106 }
+Move { window: Key { key: 524322, ty: Window }, x: 178, y: 130 }
+Move { window: Key { key: 524322, ty: Window }, x: 220, y: 154 }
+Move { window: Key { key: 524322, ty: Window }, x: 278, y: 190 }
+Move { window: Key { key: 524322, ty: Window }, x: 300, y: 201 }
+Move { window: Key { key: 524322, ty: Window }, x: 309, y: 209 }
+Size { window: Key { key: 524322, ty: Window }, width: 633, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 638, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 646, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 653, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 665, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 668, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 679, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 687, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 670, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 647, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 644, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 643, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 633, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 625, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 605, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 606, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 627, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 655, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 683, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 687, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 716, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 733, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 758, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 856, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 925, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 936, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 934, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 905, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 802, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 622, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 461, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 418, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 407, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 408, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Move { window: Key { key: 524322, ty: Window }, x: 308, y: 212 }
+Move { window: Key { key: 524322, ty: Window }, x: 308, y: 218 }
+Move { window: Key { key: 524322, ty: Window }, x: 308, y: 227 }
+Move { window: Key { key: 524322, ty: Window }, x: 312, y: 241 }
+Move { window: Key { key: 524322, ty: Window }, x: 329, y: 270 }
+Move { window: Key { key: 524322, ty: Window }, x: 381, y: 307 }
+Move { window: Key { key: 524322, ty: Window }, x: 423, y: 321 }
+Move { window: Key { key: 524322, ty: Window }, x: 467, y: 329 }
+Move { window: Key { key: 524322, ty: Window }, x: 508, y: 329 }
+Move { window: Key { key: 524322, ty: Window }, x: 552, y: 321 }
+Move { window: Key { key: 524322, ty: Window }, x: 614, y: 283 }
+Move { window: Key { key: 524322, ty: Window }, x: 649, y: 224 }
+Move { window: Key { key: 524322, ty: Window }, x: 650, y: 162 }
+Move { window: Key { key: 524322, ty: Window }, x: 618, y: 135 }
+Move { window: Key { key: 524322, ty: Window }, x: 588, y: 128 }
+Move { window: Key { key: 524322, ty: Window }, x: 557, y: 134 }
+Move { window: Key { key: 524322, ty: Window }, x: 534, y: 147 }
+Move { window: Key { key: 524322, ty: Window }, x: 515, y: 162 }
+Move { window: Key { key: 524322, ty: Window }, x: 502, y: 172 }
+Move { window: Key { key: 524322, ty: Window }, x: 497, y: 179 }
+Move { window: Key { key: 524322, ty: Window }, x: 496, y: 180 }
+Move { window: Key { key: 524322, ty: Window }, x: 497, y: 181 }
+Size { window: Key { key: 524322, ty: Window }, width: 409, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 416, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 452, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 532, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 593, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 594, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 595, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 618, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 626, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 625, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 594, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 473, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 339, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 277, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 272, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 273, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 291, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 364, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 498, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 632, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 685, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 715, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 789, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 800, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 823, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 824, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 806, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 652, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 578, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 519, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 461, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 458, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 462, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 493, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 616, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 719, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 767, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 794, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 807, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 798, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 733, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 603, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 421, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 314, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 306, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 343, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 451, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 619, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 731, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 851, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 856, height: 373, special: None }
+Paint { window: Key { key: 524322, ty: Window }, dc: Key { key: 3276857, ty: Dc } }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 786500, ty: GdiObject } }
+[DEBUG yaww::gui_thread::process] Received directive: MoveTo { dc: Key { key: 3276857, ty: Dc }, x: 200, y: 200 }
+[DEBUG yaww::gui_thread::process] Received directive: LineTo { dc: Key { key: 3276857, ty: Dc }, x: 300, y: 400 }
+[DEBUG yaww::gui_thread::process] Received directive: SelectObject { dc: Key { key: 3276857, ty: Dc }, object: Key { key: 65575, ty: GdiObject } }
+Size { window: Key { key: 524322, ty: Window }, width: 839, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 706, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 534, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 392, height: 373, special: None }
+Size { window: Key { key: 524322, ty: Window }, width: 388, height: 373, special: None }
+Close(Key { key: 524322, ty: Window })
+Deactivate(Key { key: 524322, ty: Window })
+KillFocus(Key { key: 524322, ty: Window })
+[DEBUG yaww::wndproc] Window count is now 0
+[DEBUG yaww::wndproc] Posting quit message into queue
+Quit
+[DEBUG yaww::gui_thread::process] Received directive: DeleteObject(Key { key: 786500, ty: GdiObject })
+[INFO  yaww::gui_thread::thread] Leaving GUI thread main loop...

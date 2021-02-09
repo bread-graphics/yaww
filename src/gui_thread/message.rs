@@ -225,7 +225,7 @@ pub enum Directive {
     // misc. functions
     BeginWait,
     #[doc(hidden)]
-    Dummy,
+    RelaxDirectiveThread,
     #[doc(hidden)]
     DeferEventProcessing,
 }
