@@ -1,104 +1,84 @@
 // MIT/Apache2 License
 
-use std::{ffi::CString, fmt, iter, ptr};
+use std::{ffi::CString, fmt, ptr};
 use winapi::{
-    shared::{
-        minwindef::DWORD,
-        ntdef::{CHAR, LANG_NEUTRAL, MAKELANGID, SUBLANG_DEFAULT},
-    },
-    um::{errhandlingapi::GetLastError, winbase},
+    shared::minwindef::DWORD,
+    um::{errhandlingapi, winbase},
 };
 
-/// Error type combinator.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Error {
-    ChannelFailed,
-    PtrAlreadyExists,
-    TypeMismatch,
-    Win32Error {
+    ServerClosed,
+    Win32 {
         code: DWORD,
-        description: CString,
-        calling_function: Option<&'static str>,
+        message: CString,
+        function: Option<&'static str>,
     },
-    HandlerChangedDuringEvent,
-    ErrorFailed,
+    FailedToGetError,
 }
-
-impl std::error::Error for Error {}
 
 impl fmt::Display for Error {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ChannelFailed => f.write_str("Unable to send messages through channel"),
-            Self::PtrAlreadyExists => {
-                f.write_str("The given pointer is already given by the provider")
+            Error::ServerClosed => {
+                f.write_str("Attempted to send request to the GUI thread after it closed")
             }
-            Self::TypeMismatch => {
-                f.write_str("Attempted to use an improper pointer key for a value")
-            }
-            Self::HandlerChangedDuringEvent => {
-                f.write_str("Attempted to change event handler during an event")
-            }
-            Self::Win32Error {
+            Error::Win32 {
                 code,
-                description,
-                calling_function: None,
-            } => write!(f, "Win32 Error ({}): {:?}", code, description),
-            Self::Win32Error {
+                message,
+                function: None,
+            } => write!(f, "Win32 error with code {}: {:?}", code, message),
+            Error::Win32 {
                 code,
-                description,
-                calling_function: Some(cf),
+                message,
+                function: Some(function),
             } => write!(
                 f,
-                "Win32 Error while calling {} ({}): {:?}",
-                cf, code, description
+                "Win32 error in function {} with code {}: {:?}",
+                code, function, message
             ),
-            Self::ErrorFailed => f.write_str("Failed to get error"),
+            Error::FailedToGetError => f.write_str("Failed to get the error message"),
         }
     }
 }
 
-pub type Result<T = ()> = std::result::Result<T, Error>;
-
 impl Error {
     #[inline]
-    pub(crate) fn win32_error(function: Option<&'static str>) -> Self {
-        // first, get the error code
-        let code = unsafe { GetLastError() };
+    pub(crate) fn win32_error(function: Option<&'static str>) -> Error {
+        // get the error code associated with the last function
+        let error = unsafe { errhandlingapi::GetLastError() };
 
-        // then, allocate some memory so we can format the message
-        // TODO: make this new_uninit once that gets stabilized
-        const MAX_BUFFER_LEN: usize = 100;
-        let mut description: Vec<CHAR> = iter::repeat(0).take(MAX_BUFFER_LEN).collect();
+        // allocate memory for the error message
+        const MESSAGE_BUFFER: usize = 256;
+        let mut message = Vec::with_capacity(MESSAGE_BUFFER);
 
+        // get the message
         let len = unsafe {
             winbase::FormatMessageA(
                 winbase::FORMAT_MESSAGE_FROM_SYSTEM | winbase::FORMAT_MESSAGE_IGNORE_INSERTS,
-                ptr::null(),
-                code,
-                MAKELANGID(LANG_NEUTRAL as _, SUBLANG_DEFAULT as _) as _,
-                description.as_mut_ptr(),
-                MAX_BUFFER_LEN as _,
+                ptr::null_mut(),
+                error,
+                0,
+                message.as_mut_ptr() as *mut _,
+                MESSAGE_BUFFER as _,
                 ptr::null_mut(),
             )
         };
         if len == 0 {
-            Error::ErrorFailed
+            Error::FailedToGetError
         } else {
-            let description: Box<[u8]> = description
-                .into_iter()
-                .map(|e| e as u8)
-                .take(len as _)
-                .collect();
-            match CString::new(description) {
-                Ok(description) => Error::Win32Error {
-                    code,
-                    description,
-                    calling_function: function,
+            unsafe { message.set_len(len as usize) };
+            match CString::new(message) {
+                Ok(message) => Error::Win32 {
+                    code: error,
+                    message,
+                    function,
                 },
-                Err(_) => Error::ErrorFailed,
+                Err(_) => Error::FailedToGetError,
             }
         }
     }
 }
+
+pub type Result<O = ()> = std::result::Result<O, Error>;

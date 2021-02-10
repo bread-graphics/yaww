@@ -1,25 +1,26 @@
 // MIT/Apache2 License
 
 #![cfg(windows)]
+#![allow(unused_unsafe)] // this is done on purpose
 
-pub mod bitmap;
 pub mod brush;
-pub mod color;
 pub mod cursor;
-pub mod dc;
-mod error;
-pub mod gdiobj;
-pub mod gui_thread;
 pub mod icon;
-pub mod menu;
-pub mod pen;
-pub mod ptr;
 pub mod window;
+pub mod window_class;
 
-pub(crate) mod refcell;
+pub(crate) mod directive;
+pub(crate) mod error;
+pub(crate) mod event;
+pub(crate) mod key;
+pub(crate) mod server;
+pub(crate) mod task;
+pub(crate) mod util;
+pub(crate) mod window_data;
 pub(crate) mod wndproc;
 
-pub use color::*;
 pub use error::*;
-pub use gui_thread::{Directive, Event, GuiThread, Response};
-pub use pen::*;
+pub use key::*;
+pub use server::GuiThread;
+pub use window::*;
+pub use window_class::*;

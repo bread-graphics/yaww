@@ -1,5 +1,5 @@
 // MIT/Apache2 License
 
-use crate::gui_thread::Key;
+use crate::Key;
 
 pub type Cursor = Key;
