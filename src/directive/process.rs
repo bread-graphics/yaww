@@ -71,6 +71,10 @@ impl Directive {
                 parent,
                 menu,
             )),
+            Directive::ShowWindow { window, command } => {
+                unsafe { winuser::ShowWindow(window.as_ptr().as_ptr().cast(), command.bits()) };
+                task.complete::<()>(());
+            }
             _ => unreachable!(),
         }
     }

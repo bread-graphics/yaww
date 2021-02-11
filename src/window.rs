@@ -37,6 +37,16 @@ impl GuiThread {
     }
 }
 
+impl Window {
+    #[inline]
+    pub fn show(self, gt: &GuiThread, command: ShowWindowCommand) -> crate::Result<Task<()>> {
+        gt.send_directive(Directive::ShowWindow {
+            window: self,
+            command,
+        })
+    }
+}
+
 bitflags::bitflags! {
     #[doc = "Extended window style"]
     pub struct ExtendedWindowStyle : DWORD {

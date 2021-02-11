@@ -10,7 +10,7 @@ use crate::{
     menu::Menu,
     server::GuiThread,
     util::DebugContainer,
-    window::{ExtendedWindowStyle, Window, WindowStyle},
+    window::{ExtendedWindowStyle, ShowWindowCommand, Window, WindowStyle},
     window_class::ClassStyle,
 };
 use std::{borrow::Cow, ffi::CStr};
@@ -44,5 +44,9 @@ pub(crate) enum Directive {
         height: c_int,
         parent: Option<Window>,
         menu: Option<Menu>,
+    },
+    ShowWindow {
+        window: Window,
+        command: ShowWindowCommand,
     },
 }

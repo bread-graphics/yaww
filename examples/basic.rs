@@ -3,7 +3,7 @@
 use const_cstr::const_cstr;
 use yaww::{
     brush::DEFAULT_BRUSH,
-    window::{ExtendedWindowStyle, WindowStyle},
+    window::{ShowWindowCommand, ExtendedWindowStyle, WindowStyle},
     window_class::ClassStyle,
     GuiThread, Result,
 };
@@ -36,7 +36,7 @@ fn main() -> Result {
     .wait()?;
 
     // create the window proper
-    gt.create_window(
+    let window = gt.create_window(
         CLASS_NAME.as_cstr(),
         Some(WINDOW_NAME.as_cstr().into()),
         WindowStyle::OVERLAPPED_WINDOW,
@@ -49,6 +49,7 @@ fn main() -> Result {
         None,
     )?
     .wait()?;
+    window.show(&gt, ShowWindowCommand::SHOW)?.wait();
 
     Ok(())
 }
