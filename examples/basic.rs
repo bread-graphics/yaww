@@ -50,7 +50,13 @@ fn main() -> Result {
             None,
         )?
         .wait()?;
-    window.show(&gt, ShowWindowCommand::SHOW)?.wait();
+    let showtask = window.show(&gt, ShowWindowCommand::SHOW)?;
+
+    // set up an event handler
+    let sehtask = gt.set_event_handler(|_, ev| println!("{:?}", ev))?;
+
+    showtask.wait();
+    sehtask.wait();
 
     gt.main_loop()?.wait();
     Ok(())

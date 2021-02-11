@@ -26,7 +26,7 @@ impl GuiThread {
     pub fn new() -> Self {
         let (task_sender, task_receiver) = flume::unbounded();
 
-        thread::create(task_receiver);
+        thread::create(task_sender.clone(), task_receiver);
         Self { task_sender }
     }
 
@@ -34,6 +34,11 @@ impl GuiThread {
     #[inline]
     pub(crate) fn inferior_copy(task_sender: Sender<Option<ServerTask>>) -> Self {
         Self { task_sender }
+    }
+
+    #[inline]
+    pub(crate) fn into_inner(self) -> Sender<Option<ServerTask>> {
+        self.task_sender
     }
 
     /// Send a directive to the GUI thread and get a task bask to wait on.
@@ -55,7 +60,7 @@ impl GuiThread {
 
     /// Set the event handler.
     #[inline]
-    pub fn set_event_handler<F: Fn(&GuiThread, Event) + Send + 'static>(
+    pub fn set_event_handler<F: Fn(&GuiThread, Event) + Send + Sync + 'static>(
         &self,
         f: F,
     ) -> crate::Result<Task<()>> {
@@ -68,7 +73,7 @@ impl GuiThread {
     #[inline]
     pub fn set_async_event_handler<
         Fut: Future<Output = ()>,
-        F: Fn(&GuiThread, Event) -> Fut + Send + 'static,
+        F: Fn(&GuiThread, Event) -> Fut + Send + Sync + 'static,
     >(
         &self,
         f: F,

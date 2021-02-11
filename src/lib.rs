@@ -5,6 +5,7 @@
 
 pub mod brush;
 pub mod cursor;
+pub mod dc;
 pub mod icon;
 pub mod menu;
 pub mod task;

@@ -19,8 +19,10 @@ pub(crate) struct WindowData {
     pub dt_action: Sender<DirectiveThreadMessage>,
     // we should be able to receive server tasks in the event
     pub task_recv: Receiver<Option<ServerTask>>,
+    // used to send dummy tasks
+    pub task_send: Sender<Option<ServerTask>>,
     // container for the event handler
-    pub event_handler: RefCell<Box<dyn Fn(&GuiThread, Event) + Send + 'static>>,
+    pub event_handler: RefCell<Box<dyn Fn(&GuiThread, Event) + Send + Sync + 'static>>,
     // the waiting task we notify once the loop is complete
     pub waiter: RefCell<Option<ServerTask>>,
 }

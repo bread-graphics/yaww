@@ -18,7 +18,7 @@ static THREAD_INDEX: AtomicUsize = AtomicUsize::new(0);
 const WM_YAWW_SRVTASK: UINT = winuser::WM_USER + 0x1337;
 
 #[inline]
-pub(crate) fn create(recv: Receiver<Option<ServerTask>>) {
+pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<ServerTask>>) {
     let index = THREAD_INDEX.fetch_add(1, Ordering::AcqRel);
 
     // spawn the gui thread
@@ -37,6 +37,7 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>) {
                 window_count: Cell::new(0),
                 waiter: RefCell::new(None),
                 dt_action,
+                task_send: sender,
                 task_recv: recv.clone(),
                 event_handler: RefCell::new(Box::new(|_, ev| {
                     log::warn!("Event ignored: {:?}", ev)
@@ -88,12 +89,7 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>) {
 
                         // send the task to the main thread by posting it in the message queue
                         unsafe {
-                            winuser::PostThreadMessageA(
-                                thread_id,
-                                WM_YAWW_SRVTASK,
-                                0,
-                                taskraw as _,
-                            )
+                            winuser::PostThreadMessageA(thread_id, WM_YAWW_SRVTASK, 0, taskraw as _)
                         };
                     }
                 })
@@ -125,7 +121,7 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>) {
                             let task = unsafe { Box::from_raw(taskptr) };
 
                             // try to get the directive from the task
-                            let directive = task.directive(); 
+                            let directive = task.directive();
 
                             // process the directive
                             directive.process(&window_data, *task);

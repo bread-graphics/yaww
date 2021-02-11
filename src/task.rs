@@ -2,7 +2,17 @@
 
 use crate::directive::Directive;
 use spinning_top::Spinlock;
-use std::{any::Any, hint::unreachable_unchecked, sync::{atomic::{Ordering, AtomicBool}, Mutex, Arc}, task::{Context, Waker, Poll}, future::Future, thread::{self, Thread}, pin::Pin};
+use std::{
+    any::Any,
+    future::Future,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    task::{Context, Poll, Waker},
+    thread::{self, Thread},
+};
 
 enum DirectiveOrOutput<T> {
     Directive(Directive),
@@ -24,13 +34,13 @@ struct Inner<T: Any + Send + Sync + 'static> {
 impl<T: Any + Send + Sync + 'static> Inner<T> {
     #[inline]
     fn is_complete(&self) -> Option<T> {
-        let mut l = self.d_or_o.lock().unwrap(); 
+        let mut l = self.d_or_o.lock().unwrap();
         match &mut *l {
             None => None,
             Some(DirectiveOrOutput::Directive(_)) => None,
             Some(DirectiveOrOutput::Output(_)) => Some(match l.take() {
                 Some(DirectiveOrOutput::Output(o)) => o,
-                _ => unreachable!(), 
+                _ => unreachable!(),
             }),
         }
     }
@@ -53,10 +63,10 @@ trait InnerGeneric {
 impl<T: Any + Send + Sync + 'static> InnerGeneric for Inner<T> {
     #[inline]
     fn directive(&self) -> Directive {
-         match self.d_or_o.lock().unwrap().take() {
+        match self.d_or_o.lock().unwrap().take() {
             Some(DirectiveOrOutput::Directive(d)) => d,
             _ => panic!("Already pulled directive from task"),
-         }
+        }
     }
 
     #[inline]
@@ -127,13 +137,17 @@ impl ServerTask {
     }
 }
 
-pub(crate) fn create_task<T: Any + Send + Sync + 'static>(directive: Directive) -> (Task<T>, ServerTask) {
+pub(crate) fn create_task<T: Any + Send + Sync + 'static>(
+    directive: Directive,
+) -> (Task<T>, ServerTask) {
     let inner = Arc::new(Inner {
         d_or_o: Mutex::new(Some(DirectiveOrOutput::Directive(directive))),
         t_or_w: Spinlock::new(None),
     });
 
-    let srvtask = ServerTask { inner: inner.clone() };
+    let srvtask = ServerTask {
+        inner: inner.clone(),
+    };
     let task = Task { inner };
     (task, srvtask)
 }
