@@ -51,5 +51,5 @@ fn main() -> Result {
     .wait()?;
     window.show(&gt, ShowWindowCommand::SHOW)?.wait();
 
-    Ok(())
+    gt.main_loop()
 }

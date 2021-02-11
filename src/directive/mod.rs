@@ -20,6 +20,7 @@ use winapi::ctypes::c_int;
 pub(crate) enum Directive {
     // utility functions
     SetEventHandler(DebugContainer<Box<dyn Fn(&GuiThread, Event) + Send + 'static>>),
+    BeginWait,
 
     // class functions
     RegisterClass {

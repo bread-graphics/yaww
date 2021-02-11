@@ -84,5 +84,25 @@ fn exchange_event(
     lparam: LPARAM,
     window_data: &WindowData,
 ) -> Option<LRESULT> {
+    match msg {
+        winuser::WM_CLOSE => {
+            unsafe { winuser::DestroyWindow(hwnd.as_ptr()) };
+            return Some(0);
+        }
+        winuser::WM_DESTROY => {
+            // decrement the window counter by one
+            let window_count = window_data.window_count.get().saturating_sub(1);
+            window_data.window_count.set(window_count);
+
+            // if the window count is zero and we're in a wait cycle, send the quit message to the thread
+            if window_count == 0 && window_data.waiting.get() {
+                unsafe { winuser::PostQuitMessage(0) };
+            }
+
+            return Some(0);
+        }
+        _ => (),
+    }
+
     None
 }

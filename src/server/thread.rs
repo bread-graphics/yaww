@@ -147,6 +147,9 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>, wait: Sender<()>) {
                     }
                 }
             }
+
+            // before we die, unwait the thread, absorb the error
+            wait.send(()).ok();
         })
         .expect("Failed to spawn GUI thread");
 }

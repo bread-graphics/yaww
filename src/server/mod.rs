@@ -85,4 +85,38 @@ impl GuiThread {
     ) -> crate::Result<Task<()>> {
         self.set_event_handler(move |gt, ev| future::block_on(f(gt, ev)))
     }
+
+    /// Wait for the event loop to complete.
+    #[inline]
+    pub fn main_loop(mut self) -> crate::Result {
+        match self.wait_cycle.take() {
+            None => panic!("Cannot run main loop within the event handler"),
+            Some(wait) => {
+                // send a directive that tells the gui thread we're waiting
+                self.send_directive::<()>(Directive::BeginWait)?.wait();
+
+                // now, we wait
+                // this is just to block, so don't worry about the result
+                wait.recv().ok();
+                Ok(())
+            }
+        }
+    }
+
+    /// Wait for the event loop to complete, async redox.
+    #[inline]
+    pub async fn main_loop_async(mut self) -> crate::Result {
+        match self.wait_cycle.take() {
+            None => panic!("Cannot run main loop within the event handler"),
+            Some(wait) => {
+                // send a directive that tells the gui thread we're waiting
+                self.send_directive::<()>(Directive::BeginWait)?.await;
+
+                // now, we wait
+                // this is just to block, so don't worry about the result
+                wait.recv_async().await.ok();
+                Ok(())
+            }
+        }
+    }
 }

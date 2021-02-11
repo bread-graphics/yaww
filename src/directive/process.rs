@@ -28,6 +28,10 @@ impl Directive {
                     event_handler.into_inner();
                 task.complete::<()>(());
             }
+            Directive::BeginWait => {
+                window_data.waiting.set(true);
+                task.complete::<()>(());
+            }
             Directive::RegisterClass {
                 style,
                 icon,
