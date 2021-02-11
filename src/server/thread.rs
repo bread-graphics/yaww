@@ -18,7 +18,7 @@ static THREAD_INDEX: AtomicUsize = AtomicUsize::new(0);
 const WM_YAWW_SRVTASK: UINT = winuser::WM_USER + 0x1337;
 
 #[inline]
-pub(crate) fn create(recv: Receiver<Option<ServerTask>>, wait: Sender<()>) {
+pub(crate) fn create(recv: Receiver<Option<ServerTask>>) {
     let index = THREAD_INDEX.fetch_add(1, Ordering::AcqRel);
 
     // spawn the gui thread
@@ -35,7 +35,7 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>, wait: Sender<()>) {
             // this is kept in thread memory that's valid for as long as wndprocs are being run
             let window_data = WindowData {
                 window_count: Cell::new(0),
-                waiting: Cell::new(false),
+                waiter: RefCell::new(None),
                 dt_action,
                 task_recv: recv.clone(),
                 event_handler: RefCell::new(Box::new(|_, ev| {
@@ -149,7 +149,11 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>, wait: Sender<()>) {
             }
 
             // before we die, unwait the thread, absorb the error
-            wait.send(()).ok();
+            let mut waiter = window_data.waiter.borrow_mut();
+            if let Some(waiter) = waiter.take() {
+                waiter.complete::<()>(());
+            }
+            mem::drop(waiter);
         })
         .expect("Failed to spawn GUI thread");
 }

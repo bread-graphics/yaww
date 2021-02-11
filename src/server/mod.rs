@@ -18,9 +18,6 @@ pub(crate) use thread::DirectiveThreadMessage;
 pub struct GuiThread {
     // sends the requests to the server
     task_sender: Sender<Option<ServerTask>>,
-    // the option that waits until the server is dead
-    // None if this is the inferior copy
-    wait_cycle: Option<Receiver<()>>,
 }
 
 impl GuiThread {
@@ -28,22 +25,15 @@ impl GuiThread {
     #[inline]
     pub fn new() -> Self {
         let (task_sender, task_receiver) = flume::unbounded();
-        let (wait_cycle_propogator, wait_cycle) = flume::unbounded();
 
-        thread::create(task_receiver, wait_cycle_propogator);
-        Self {
-            task_sender,
-            wait_cycle: Some(wait_cycle),
-        }
+        thread::create(task_receiver);
+        Self { task_sender }
     }
 
     /// Create an inferior copy of the GuiThread.
     #[inline]
     pub(crate) fn inferior_copy(task_sender: Sender<Option<ServerTask>>) -> Self {
-        Self {
-            task_sender,
-            wait_cycle: None,
-        }
+        Self { task_sender }
     }
 
     /// Send a directive to the GUI thread and get a task bask to wait on.
@@ -88,35 +78,8 @@ impl GuiThread {
 
     /// Wait for the event loop to complete.
     #[inline]
-    pub fn main_loop(mut self) -> crate::Result {
-        match self.wait_cycle.take() {
-            None => panic!("Cannot run main loop within the event handler"),
-            Some(wait) => {
-                // send a directive that tells the gui thread we're waiting
-                self.send_directive::<()>(Directive::BeginWait)?.wait();
-
-                // now, we wait
-                // this is just to block, so don't worry about the result
-                wait.recv().ok();
-                Ok(())
-            }
-        }
-    }
-
-    /// Wait for the event loop to complete, async redox.
-    #[inline]
-    pub async fn main_loop_async(mut self) -> crate::Result {
-        match self.wait_cycle.take() {
-            None => panic!("Cannot run main loop within the event handler"),
-            Some(wait) => {
-                // send a directive that tells the gui thread we're waiting
-                self.send_directive::<()>(Directive::BeginWait)?.await;
-
-                // now, we wait
-                // this is just to block, so don't worry about the result
-                wait.recv_async().await.ok();
-                Ok(())
-            }
-        }
+    pub fn main_loop(mut self) -> crate::Result<Task<()>> {
+        // send a directive that tells the gui thread we're waiting
+        self.send_directive::<()>(Directive::BeginWait)
     }
 }

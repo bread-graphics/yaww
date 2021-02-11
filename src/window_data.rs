@@ -15,12 +15,12 @@ use std::{
 pub(crate) struct WindowData {
     // the number of windows currently active
     pub window_count: Cell<usize>,
-    // whether or not we're in the wait cycle
-    pub waiting: Cell<bool>,
     // send directive thread messages to the directive thread
     pub dt_action: Sender<DirectiveThreadMessage>,
     // we should be able to receive server tasks in the event
     pub task_recv: Receiver<Option<ServerTask>>,
     // container for the event handler
     pub event_handler: RefCell<Box<dyn Fn(&GuiThread, Event) + Send + 'static>>,
+    // the waiting task we notify once the loop is complete
+    pub waiter: RefCell<Option<ServerTask>>,
 }

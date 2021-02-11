@@ -95,7 +95,7 @@ fn exchange_event(
             window_data.window_count.set(window_count);
 
             // if the window count is zero and we're in a wait cycle, send the quit message to the thread
-            if window_count == 0 && window_data.waiting.get() {
+            if window_count == 0 && window_data.waiter.borrow().is_some() {
                 unsafe { winuser::PostQuitMessage(0) };
             }
 

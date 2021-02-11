@@ -29,8 +29,7 @@ impl Directive {
                 task.complete::<()>(());
             }
             Directive::BeginWait => {
-                window_data.waiting.set(true);
-                task.complete::<()>(());
+                *window_data.waiter.borrow_mut() = Some(task);
             }
             Directive::RegisterClass {
                 style,
