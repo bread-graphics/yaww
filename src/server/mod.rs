@@ -5,11 +5,12 @@ mod thread;
 use crate::{
     directive::Directive,
     event::Event,
+    future,
     task::{self, ServerTask, Task},
     util::DebugContainer,
 };
 use flume::{Receiver, Sender};
-use std::any::Any;
+use std::{any::Any, future::Future};
 
 pub(crate) use thread::DirectiveThreadMessage;
 
@@ -54,26 +55,9 @@ impl GuiThread {
         // create the task/servertask pair
         let (tsk, server_tsk) = unsafe { task::create_task::<T>(directive) };
         // send the server task to the server for processing
+        // note: should never block, channel should never be over capacity
         self.task_sender
-            .send(Some(server_tsk))
-            .map_err(|_| crate::Error::ServerClosed)?;
-        // return the client task to the user
-        Ok(tsk)
-    }
-
-    /// Send a directive to the GUI thread without blocking while sending.
-    #[cfg(feature = "async")]
-    #[inline]
-    pub(crate) async fn send_directive_async<T: Any + Send + Sync + 'static>(
-        &self,
-        directive: Directive,
-    ) -> crate::Result<Task<T>> {
-        // create the task/servertask pair
-        let (tsk, server_tsk) = unsafe { task::create_task::<T>(directive) };
-        // send the server task to the server for processing
-        self.task_sender
-            .send_async(server_tsk)
-            .await
+            .try_send(Some(server_tsk))
             .map_err(|_| crate::Error::ServerClosed)?;
         // return the client task to the user
         Ok(tsk)
@@ -88,20 +72,9 @@ impl GuiThread {
         self.send_directive(Directive::SetEventHandler(DebugContainer::new(Box::new(f))))
     }
 
-    /// Set the event handler, but use a non-blocking transfer mechanism.
-    #[cfg(feature = "async")]
-    #[inline]
-    pub fn set_event_handler_async<'future, F: Fn(&GuiThread, Event) + Send + 'static>(
-        &'future self,
-        f: F,
-    ) -> impl Future<Output = crate::Result<Task<()>>> + 'future {
-        self.send_directive_async(Directive::SetEventHandler(DebugContainer::new(Box::new(f))))
-    }
-
     /// Set the event handler to be an async function.
     ///
     /// Note that the future that the function returns should probably be spawned.
-    #[cfg(feature = "async")]
     #[inline]
     pub fn set_async_event_handler<
         Fut: Future<Output = ()>,
@@ -110,24 +83,6 @@ impl GuiThread {
         &self,
         f: F,
     ) -> crate::Result<Task<()>> {
-        let f = move |gt, ev| future::block_on(f(gt, ev));
-        self.send_directive(Directive::SetEventHandler(Box::new(f)))
-    }
-
-    /// Set the event handler to be an async function, but use a non-blocking transfer mechanism.
-    ///
-    /// Note that the future that the function returns should probably be spawned.
-    #[cfg(feature = "async")]
-    #[inline]
-    pub fn set_async_event_handler_async<
-        'future,
-        Fut: Future<Output = ()>,
-        F: Fn(&GuiThread, Event) -> Fut + Send + 'static,
-    >(
-        &'future self,
-        f: F,
-    ) -> impl Future<Output = crate::Result<Task<()>>> + 'future {
-        let f = move |gt, ev| future::block_on(f(gt, ev));
-        self.send_directive_async(Directive::SetEventHandler(Box::new(f)))
+        self.set_event_handler(move |gt, ev| future::block_on(f(gt, ev)))
     }
 }

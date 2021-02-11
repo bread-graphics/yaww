@@ -7,12 +7,14 @@ use crate::{
     cursor::Cursor,
     event::Event,
     icon::Icon,
+    menu::Menu,
     server::GuiThread,
     util::DebugContainer,
-    window::{ExtendedWindowStyle, WindowStyle},
+    window::{ExtendedWindowStyle, Window, WindowStyle},
     window_class::ClassStyle,
 };
 use std::{borrow::Cow, ffi::CStr};
+use winapi::ctypes::c_int;
 
 #[derive(Debug)]
 pub(crate) enum Directive {
@@ -28,5 +30,19 @@ pub(crate) enum Directive {
         background: Option<Brush>,
         class_name: Cow<'static, CStr>,
         menu_name: Option<Cow<'static, CStr>>,
+    },
+
+    // window functions
+    CreateWindow {
+        class_name: Cow<'static, CStr>,
+        window_name: Option<Cow<'static, CStr>>,
+        style: WindowStyle,
+        extended_style: ExtendedWindowStyle,
+        x: c_int,
+        y: c_int,
+        width: c_int,
+        height: c_int,
+        parent: Option<Window>,
+        menu: Option<Menu>,
     },
 }

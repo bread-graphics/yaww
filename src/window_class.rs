@@ -1,7 +1,9 @@
 // MIT/Apache2 License
 
-use crate::{directive::Directive, brush::Brush, icon::Icon, cursor::Cursor, server::GuiThread};
-use std::{future::Future, borrow::Cow, ffi::CStr};
+use crate::{
+    brush::Brush, cursor::Cursor, directive::Directive, icon::Icon, server::GuiThread, task::Task,
+};
+use std::{borrow::Cow, ffi::CStr, future::Future};
 use winapi::{shared::minwindef::UINT, um::winuser};
 
 bitflags::bitflags! {
@@ -25,14 +27,24 @@ bitflags::bitflags! {
 impl GuiThread {
     /// Register a class.
     #[inline]
-    pub fn register_class<CN: Into<Cow<'static, CStr>>>(&self, class_name: CN, menu_name: Option<Cow<'static, CStr>>, style: ClassStyle, icon: Option<Icon>, small_icon: Option<Icon>, cursor: Option<Cursor>, background: Option<Brush>) -> crate::Result<Task<crate::Result>> {
-        self.send_directive(Directive::RegisterClass { class_name: class_name.into(), menu_name, style, icon, small_icon, cursor, background })
-    }
-
-    /// Register a class, but use a non-blocking transfer mechanism.
-    #[cfg(feature = "async")]
-    #[inline]
-    pub fn register_class_async<CN: Into<Cow<'static, CStr>>>(&self, class_name: CN, menu_name: Option<Cow<'static, CStr>>, style: ClassStyle, icon: Option<Icon>, small_icon: Option<Icon>, cursor: Option<Cursor>, background: Option<Brush>) -> impl Future<Output = crate::Result<Task<crate::Result>>> {
-        self.send_directive_async(Directive::RegisterClass { class_name: class_name.into(), menu_name, style, icon, small_icon, cursor, background })
+    pub fn register_class<CN: Into<Cow<'static, CStr>>>(
+        &self,
+        class_name: CN,
+        menu_name: Option<Cow<'static, CStr>>,
+        style: ClassStyle,
+        icon: Option<Icon>,
+        small_icon: Option<Icon>,
+        cursor: Option<Cursor>,
+        background: Option<Brush>,
+    ) -> crate::Result<Task<crate::Result>> {
+        self.send_directive(Directive::RegisterClass {
+            class_name: class_name.into(),
+            menu_name,
+            style,
+            icon,
+            small_icon,
+            cursor,
+            background,
+        })
     }
 }

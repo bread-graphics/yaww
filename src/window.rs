@@ -1,9 +1,41 @@
 // MIT/Apache2 License
 
-use crate::Key;
+use crate::{directive::Directive, menu::Menu, server::GuiThread, task::Task, Key};
+use std::{borrow::Cow, ffi::CStr};
 use winapi::{ctypes::c_int, shared::minwindef::DWORD, um::winuser};
 
 pub type Window = Key;
+
+impl GuiThread {
+    /// Create a new window.
+    #[inline]
+    pub fn create_window<CN: Into<Cow<'static, CStr>>>(
+        &self,
+        class_name: CN,
+        window_name: Option<Cow<'static, CStr>>,
+        style: WindowStyle,
+        extended_style: ExtendedWindowStyle,
+        x: c_int,
+        y: c_int,
+        width: c_int,
+        height: c_int,
+        parent: Option<Window>,
+        menu: Option<Menu>,
+    ) -> crate::Result<Task<crate::Result<Window>>> {
+        self.send_directive(Directive::CreateWindow {
+            class_name: class_name.into(),
+            window_name,
+            style,
+            extended_style,
+            x,
+            y,
+            width,
+            height,
+            parent,
+            menu,
+        })
+    }
+}
 
 bitflags::bitflags! {
     #[doc = "Extended window style"]
@@ -37,7 +69,6 @@ bitflags::bitflags! {
         const WINDOW_EDGE = winuser::WS_EX_WINDOWEDGE;
     }
 }
-
 
 bitflags::bitflags! {
     #[doc = "Window style"]
@@ -90,4 +121,3 @@ bitflags::bitflags! {
         const SHOW_NORMAL = winuser::SW_SHOWNORMAL;
     }
 }
-

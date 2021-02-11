@@ -67,7 +67,7 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>, wait: Sender<()>) {
                                     // if we're being told to stop again, just continue
                                     Ok(DirectiveThreadMessage::Stop) => (),
                                     // if we're being told to start, break the stoploop and continue the dtloop
-                                    Ok(DirectiveThreadMessage::Start) => continue 'dtloop,
+                                    Ok(DirectiveThreadMessage::Start) => break 'stoploop,
                                 }
                             },
                         }
@@ -97,7 +97,8 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>, wait: Sender<()>) {
                             )
                         };
                     }
-                }).expect("Failed to spawn directive thread");
+                })
+                .expect("Failed to spawn directive thread");
 
             // begin processing messages on the message queue
             let mut msg = MaybeUninit::<winuser::MSG>::uninit();
@@ -146,7 +147,8 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>, wait: Sender<()>) {
                     }
                 }
             }
-        }).expect("Failed to spawn GUI thread");
+        })
+        .expect("Failed to spawn GUI thread");
 }
 
 #[derive(Copy, Clone)]

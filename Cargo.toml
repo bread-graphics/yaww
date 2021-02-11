@@ -4,16 +4,18 @@ version = "0.1.0"
 authors = ["not_a_seagull <jtnunley01@gmail.com>"]
 edition = "2018"
 
-[dependencies]
+[target.'cfg(windows)'.dependencies]
 bitflags = "1.2.1"
 flume = { version = "0.10", default-features = false }
 log = "0.4"
-parking = "2"
 
-[dependencies.winapi]
+[target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
 features = ["errhandlingapi", "minwindef", "processthreadsapi", "winbase", "wingdi", "winuser"]
 
+[dev-dependencies]
+const-cstr = "0.3.0"
+env_logger = { version = "0.8.2", default-features = false, features = ["atty", "termcolor"] }
+
 [features]
 default = []
-async = ["flume/async"]
