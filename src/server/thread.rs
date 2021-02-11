@@ -82,10 +82,9 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>) {
                             Err(_) => break 'dtloop,
                         };
 
-                        // remember that the server task is actually just a pointer to a heap-allocated state
-                        // machine, so we can just convert it to a pointer to pass it between the FFI boundary
-                        let taskptr = srvtask.as_ptr();
-                        mem::forget(srvtask);
+                        // put the task on the heap to pass across the FFI boundary
+                        let srvtask = Box::new(srvtask);
+                        let taskraw = Box::into_raw(srvtask);
 
                         // send the task to the main thread by posting it in the message queue
                         unsafe {
@@ -93,7 +92,7 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>) {
                                 thread_id,
                                 WM_YAWW_SRVTASK,
                                 0,
-                                taskptr.as_ptr() as _,
+                                taskraw as _,
                             )
                         };
                     }
@@ -122,21 +121,14 @@ pub(crate) fn create(recv: Receiver<Option<ServerTask>>) {
                         if msg.message == WM_YAWW_SRVTASK {
                             // reconstruct the task from the lparam pointer
                             // SAFETY: unchecked because if we have YAWW_SRVTASK we know it's us
-                            let taskptr = unsafe { NonNull::new_unchecked(msg.lParam as *mut ()) };
-                            let task = unsafe { ServerTask::from_ptr(taskptr) };
+                            let taskptr = msg.lParam as *mut ServerTask;
+                            let task = unsafe { Box::from_raw(taskptr) };
 
                             // try to get the directive from the task
-                            let directive = match unsafe { task.directive() } {
-                                Some(d) => d,
-                                None => {
-                                    // task is abandoned, destroy it
-                                    task.destroy();
-                                    continue;
-                                }
-                            };
+                            let directive = task.directive(); 
 
                             // process the directive
-                            directive.process(&window_data, task);
+                            directive.process(&window_data, *task);
                         } else {
                             // translate and dispatch the message
                             unsafe {
