@@ -9,11 +9,10 @@ bitflags = "1.2.1"
 flume = { version = "0.10", default-features = false }
 log = "0.4"
 once_cell = "1.5.2"
-spinning_top = "0.2"
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
-features = ["errhandlingapi", "minwindef", "processthreadsapi", "winbase", "wingdi", "winuser"]
+features = ["errhandlingapi", "minwindef", "processthreadsapi", "winbase", "windef", "wingdi", "winuser"]
 
 [dev-dependencies]
 const-cstr = "0.3.0"

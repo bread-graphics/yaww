@@ -28,3 +28,14 @@ pub use server::GuiThread;
 pub use task::Task;
 pub use window::*;
 pub use window_class::*;
+
+use winapi::shared::ntdef::LONG;
+
+#[derive(Debug, Copy, Clone, Default)]
+#[repr(C)]
+pub struct Rectangle {
+    pub left: LONG,
+    pub top: LONG,
+    pub right: LONG,
+    pub bottom: LONG,
+}

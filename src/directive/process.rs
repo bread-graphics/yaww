@@ -11,13 +11,43 @@ use crate::{
     window_class::ClassStyle,
     window_data::WindowData,
     wndproc::yaww_wndproc,
+    Rectangle,
 };
-use std::{ffi::CStr, mem, process::abort, ptr};
-use winapi::{ctypes::c_int, um::winuser};
+use std::{
+    ffi::{CStr, CString},
+    mem,
+    process::abort,
+    ptr,
+};
+use winapi::{ctypes::c_int, shared::windef::RECT, um::winuser};
 
 impl Directive {
     #[inline]
     pub(crate) fn process(self, window_data: &WindowData, task: ServerTask) {
+        macro_rules! complete_with_rectangle {
+            ($task: expr, $window: expr, $fname: ident) => {{
+                let mut rect = Rectangle {
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                };
+                $task.complete::<crate::Result<Rectangle>>(
+                    if unsafe {
+                        winuser::$fname(
+                            $window.as_ptr().as_ptr().cast(),
+                            &mut rect as *mut Rectangle as *mut _,
+                        )
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some(stringify!($fname))))
+                    } else {
+                        Ok(rect)
+                    },
+                )
+            }};
+        }
+
         match self {
             Directive::SetEventHandler(event_handler) => {
                 // set the event handler
@@ -77,6 +107,50 @@ impl Directive {
             Directive::ShowWindow { window, command } => {
                 unsafe { winuser::ShowWindow(window.as_ptr().as_ptr().cast(), command.bits()) };
                 task.complete::<()>(());
+            }
+            Directive::CloseWindow(window) => task.complete::<crate::Result>(
+                if unsafe { winuser::CloseWindow(window.as_ptr().as_ptr().cast()) } == 0 {
+                    Err(crate::Error::win32_error(Some("CloseWindow")))
+                } else {
+                    Ok(())
+                },
+            ),
+            Directive::GetClientRect(window) => {
+                complete_with_rectangle!(task, window, GetClientRect);
+            }
+            Directive::GetDesktopWindow => {
+                let res = unsafe { winuser::GetDesktopWindow() };
+                // if this fails, something is seriously fucked up
+                task.complete::<Window>(
+                    Window::from_ptr(res.cast()).expect("Desktop window does not exist"),
+                );
+            }
+            Directive::GetWindowRect(window) => {
+                complete_with_rectangle!(task, window, GetWindowRect);
+            }
+            Directive::GetParent(window) => {
+                task.complete::<Option<Window>>(Window::from_ptr(unsafe {
+                    winuser::GetParent(window.as_ptr().as_ptr().cast()).cast()
+                }));
+            }
+            Directive::GetWindowText(window) => {
+                let textlen =
+                    unsafe { winuser::GetWindowTextLengthA(window.as_ptr().as_ptr().cast()) };
+                let mut buffer = Vec::<u8>::with_capacity(textlen as usize + 1);
+                let textlen = unsafe {
+                    winuser::GetWindowTextA(
+                        window.as_ptr().as_ptr().cast(),
+                        buffer.as_mut_ptr() as *mut _,
+                        textlen + 1,
+                    )
+                };
+
+                task.complete::<Option<CString>>(if textlen <= 0 {
+                    None
+                } else {
+                    unsafe { buffer.set_len(textlen as usize - 1) };
+                    CString::new(buffer).ok()
+                });
             }
             _ => unreachable!(),
         }

@@ -50,4 +50,28 @@ pub(crate) enum Directive {
         window: Window,
         command: ShowWindowCommand,
     },
+    CloseWindow(Window),
+    GetClientRect(Window),
+    GetDesktopWindow,
+    GetParent(Window),
+    GetWindowRect(Window),
+    GetWindowText(Window),
+    IsChild(Window),
+    IsZoomed(Window),
+    MoveWindow {
+        window: Window,
+        x: c_int,
+        y: c_int,
+        width: c_int,
+        height: c_int,
+        repaint: bool,
+    },
+    SetParent {
+        window: Window,
+        new_parent: Option<Window>,
+    },
+    SetWindowText {
+        window: Window,
+        text: Cow<'static, CStr>,
+    },
 }

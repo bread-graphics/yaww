@@ -1,14 +1,15 @@
 // MIT/Apache2 License
 
 use crate::{
-    event::{Event, SizeReason},
     dc::Dc,
+    event::{Event, SizeReason},
     server::DirectiveThreadMessage,
     window::Window,
     window_data::WindowData,
 };
 use std::{
-    mem::{self, MaybeUninit}, process,
+    mem::{self, MaybeUninit},
+    process,
     ptr::{self, NonNull},
 };
 use winapi::{
@@ -56,6 +57,11 @@ fn inner_wndproc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESU
         Some(hwnd) => hwnd,
         None => return unsafe { winuser::DefWindowProcA(hwnd, msg, wparam, lparam) },
     };
+
+    // if the handle doesn't refer to a window, defer to the default procedure
+    if unsafe { winuser::IsWindow(hwnd.as_ptr()) } == 0 {
+        return unsafe { winuser::DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam) };
+    }
 
     // special case for WM_NCCREATE
     if msg == winuser::WM_NCCREATE {
@@ -210,7 +216,7 @@ fn exchange_event(
                 Some(dc) => dc,
                 None => return None,
             };
-            
+
             handle_event(window_data, Event::Paint { window, dc });
 
             // end the painting process

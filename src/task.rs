@@ -1,7 +1,6 @@
 // MIT/Apache2 License
 
 use crate::directive::Directive;
-use spinning_top::Spinlock;
 use std::{
     any::Any,
     future::Future,
@@ -28,7 +27,7 @@ enum ThreadOrWaker {
 struct Inner<T: Any + Send + Sync + 'static> {
     // fine using spinlocks because in most cases they shouldn't be contended
     d_or_o: Mutex<Option<DirectiveOrOutput<T>>>,
-    t_or_w: Spinlock<Option<ThreadOrWaker>>,
+    t_or_w: Mutex<Option<ThreadOrWaker>>,
 }
 
 impl<T: Any + Send + Sync + 'static> Inner<T> {
@@ -47,7 +46,7 @@ impl<T: Any + Send + Sync + 'static> Inner<T> {
 
     #[inline]
     fn wake(&self) {
-        match self.t_or_w.lock().take() {
+        match self.t_or_w.lock().unwrap().take() {
             Some(ThreadOrWaker::Thread(t)) => t.unpark(),
             Some(ThreadOrWaker::Waker(w)) => w.wake(),
             None => (),
@@ -102,7 +101,7 @@ impl<T: Any + Send + Sync + 'static> Task<T> {
                 break val;
             }
 
-            *self.inner.t_or_w.lock() = Some(ThreadOrWaker::Thread(thread::current()));
+            *self.inner.t_or_w.lock().unwrap() = Some(ThreadOrWaker::Thread(thread::current()));
             thread::park();
         }
     }
@@ -117,7 +116,7 @@ impl<T: Any + Send + Sync + 'static> Future for Task<T> {
         if let Some(val) = self.inner.is_complete() {
             Poll::Ready(val)
         } else {
-            *self.inner.t_or_w.lock() = Some(ThreadOrWaker::Waker(cx.waker().clone()));
+            *self.inner.t_or_w.lock().unwrap() = Some(ThreadOrWaker::Waker(cx.waker().clone()));
             Poll::Pending
         }
     }
@@ -142,7 +141,7 @@ pub(crate) fn create_task<T: Any + Send + Sync + 'static>(
 ) -> (Task<T>, ServerTask) {
     let inner = Arc::new(Inner {
         d_or_o: Mutex::new(Some(DirectiveOrOutput::Directive(directive))),
-        t_or_w: Spinlock::new(None),
+        t_or_w: Mutex::new(None),
     });
 
     let srvtask = ServerTask {
