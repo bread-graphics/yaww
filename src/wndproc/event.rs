@@ -14,33 +14,16 @@ unsafe impl Send for ThreadSafeEVH {}
 pub(crate) type TESTuple = (ThreadSafeEVH, Event, Sender<Option<ServerTask>>);
 
 #[inline]
-fn event_handler_handler(handler_receiver: Receiver<TESTuple>) {
+pub(crate) fn event_handler_handler(t: TESTuple) {
     // call in an infinite loop
-    loop {
-        let (event_handler, event, sender) = match handler_receiver.recv() {
-            Ok(e) => e,
-            Err(_) => break,
-        };
+    let (event_handler, event, sender) = t;
 
-        // create a GUI thread from the sender
-        let inferior = GuiThread::inferior_copy(sender);
+    // create a GUI thread from the sender
+    let inferior = GuiThread::inferior_copy(sender);
 
-        // call the event handler with the event
-        unsafe { (&*event_handler.0)(&inferior, event) };
+    // call the event handler with the event
+    unsafe { (&*event_handler.0)(&inferior, event) };
 
-        // send a dummy task down the pipe
-        if let Err(_) = inferior.into_inner().send(None) {
-            break;
-        }
-    }
+    // send a dummy task down the pipe
+    inferior.into_inner().send(None).ok();
 }
-
-pub(crate) static EVENT_HANDLER_THREAD: Lazy<Sender<TESTuple>> = Lazy::new(|| {
-    let (tes_send, tes_recv) = flume::unbounded();
-
-    thread::Builder::new()
-        .name("yaww-event-handler".to_string())
-        .spawn(move || event_handler_handler(tes_recv))
-        .expect("Failed to spawn event thread");
-    tes_send
-});

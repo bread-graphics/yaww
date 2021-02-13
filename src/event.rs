@@ -1,6 +1,7 @@
 // MIT/Apache2 License
 
 use crate::{dc::Dc, window::Window};
+use gluten_keyboard::Key;
 use std::{cell::RefCell, rc::Rc};
 use winapi::ctypes::c_int;
 
@@ -42,13 +43,42 @@ pub enum Event {
         window: Window,
         dc: Dc,
     },
+    KeyDown {
+        window: Window,
+        key: Option<Key>,
+        repeats: u16,
+    },
+    KeyUp {
+        window: Window,
+        key: Option<Key>,
+        repeats: u16,
+    },
+    ButtonDown {
+        window: Window,
+        button: MouseButton,
+        x: c_int,
+        y: c_int,
+    },
+    ButtonUp {
+        window: Window,
+        button: MouseButton,
+        x: c_int,
+        y: c_int,
+    },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SizeReason {
     None,
     Minimized,
     Maximized,
     MaxShow,
     MaxHide,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MouseButton {
+    Left,
+    Middle,
+    Right,
 }

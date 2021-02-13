@@ -152,6 +152,30 @@ impl Directive {
                     CString::new(buffer).ok()
                 });
             }
+            Directive::MoveWindow {
+                window,
+                x,
+                y,
+                width,
+                height,
+                repaint,
+            } => task.complete::<crate::Result>(
+                if unsafe {
+                    winuser::MoveWindow(
+                        window.as_ptr().as_ptr().cast(),
+                        x,
+                        y,
+                        width,
+                        height,
+                        if repaint { 1 } else { 0 },
+                    )
+                } == 0
+                {
+                    Err(crate::Error::win32_error(Some("MoveWindow")))
+                } else {
+                    Ok(())
+                },
+            ),
             _ => unreachable!(),
         }
     }

@@ -21,6 +21,7 @@ pub(crate) mod server;
 pub(crate) mod util;
 pub(crate) mod window_data;
 pub(crate) mod wndproc;
+pub(crate) mod vkey;
 
 pub use error::*;
 pub use key::*;

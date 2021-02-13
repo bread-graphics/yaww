@@ -45,6 +45,26 @@ impl Window {
             command,
         })
     }
+
+    #[inline]
+    pub fn r#move(
+        self,
+        gt: &GuiThread,
+        x: c_int,
+        y: c_int,
+        width: c_int,
+        height: c_int,
+        repaint: bool,
+    ) -> crate::Result<Task<crate::Result>> {
+        gt.send_directive(Directive::MoveWindow {
+            window: self,
+            x,
+            y,
+            width,
+            height,
+            repaint,
+        })
+    }
 }
 
 bitflags::bitflags! {

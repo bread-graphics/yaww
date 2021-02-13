@@ -6,6 +6,7 @@ use crate::{
     server::DirectiveThreadMessage,
     window::Window,
     window_data::WindowData,
+    vkey::convert_vkey_to_key as convert_vkey,
 };
 use std::{
     mem::{self, MaybeUninit},
@@ -21,6 +22,7 @@ use winapi::{
 };
 
 mod event;
+pub(crate) use event::{event_handler_handler, TESTuple};
 
 pub(crate) unsafe extern "system" fn yaww_wndproc(
     hwnd: HWND,
@@ -224,6 +226,31 @@ fn exchange_event(
 
             return Some(0);
         }
+        winuser::WM_KEYDOWN | winuser::WM_KEYUP | winuser::WM_SYSKEYDOWN | winuser::WM_SYSKEYUP => {
+            // first 15 bytes are the repeat count
+            let repeats = lparam & 0x7FFF;
+            // 24th byte is whether or not we should extend it
+            let extended = lparam & (0x1 << 23) != 0;
+
+            let key = convert_vkey(wparam as _, extended);
+
+            handle_event(
+                window_data,
+                match msg {
+                    winuser::WM_KEYDOWN | winuser::WM_SYSKEYDOWN => Event::KeyDown {
+                        window,
+                        key,
+                        repeats: repeats as _,
+                    },
+                    winuser::WM_KEYUP | winuser::WM_SYSKEYUP => Event::KeyUp {
+                        window,
+                        key,
+                        repeats: repeats as _,
+                    },
+                    _ => unreachable!(),
+                },
+            );
+        }
         _ => (),
     }
 
@@ -241,10 +268,15 @@ fn handle_event(window_data: &WindowData, event: Event) {
         .ok();
     window_data.task_send.send(None).ok();
 
-    // offload the event handler onto the event handling thread
+    // offload the event handler onto the directive processing thread
     let event_handler_ptr = event::ThreadSafeEVH(&*r);
-    event::EVENT_HANDLER_THREAD
-        .send((event_handler_ptr, event, window_data.task_send.clone()))
+    window_data
+        .dt_action
+        .send(DirectiveThreadMessage::ProcessEvent((
+            event_handler_ptr,
+            event,
+            window_data.task_send.clone(),
+        )))
         .ok();
 
     // begin processing events in this thread until the event handler finishes

@@ -1,6 +1,6 @@
 // MIT/Apache2 License
 
-use crate::{task::ServerTask, window_data::WindowData};
+use crate::{task::ServerTask, window_data::WindowData, wndproc};
 use flume::{Receiver, Sender, TryRecvError};
 use std::{
     cell::{Cell, RefCell},
@@ -59,6 +59,9 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
                             Err(TryRecvError::Disconnected) => break 'dtloop,
                             // if we're being told to start without stopping, just keep going
                             Ok(DirectiveThreadMessage::Start) => (),
+                            // if we're begin told to handle an event without stopping, we're in an unreachable
+                            // state
+                            Ok(DirectiveThreadMessage::ProcessEvent(_)) => unreachable!(),
                             // if we're being told to stop, wait for a start signal
                             Ok(DirectiveThreadMessage::Stop) => 'stoploop: loop {
                                 // wait for the next message by blocking the thread
@@ -67,6 +70,10 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
                                     Err(_) => break 'dtloop,
                                     // if we're being told to stop again, just continue
                                     Ok(DirectiveThreadMessage::Stop) => (),
+                                    // while we're parked, we might as well process events
+                                    Ok(DirectiveThreadMessage::ProcessEvent(e)) => {
+                                        wndproc::event_handler_handler(e)
+                                    }
                                     // if we're being told to start, break the stoploop and continue the dtloop
                                     Ok(DirectiveThreadMessage::Start) => break 'stoploop,
                                 }
@@ -104,7 +111,10 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
                 match res {
                     -1 => {
                         // an error occurred during GetMessageA
-                        unimplemented!("TODO: handle error");
+                        panic!(
+                            "GetMessageA error'd out: {:?}",
+                            crate::Error::win32_error(None)
+                        );
                     }
                     0 => {
                         // we just got the quit message and we need to break
@@ -146,8 +156,8 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
         .expect("Failed to spawn GUI thread");
 }
 
-#[derive(Copy, Clone)]
 pub(crate) enum DirectiveThreadMessage {
     Stop,
     Start,
+    ProcessEvent(wndproc::TESTuple),
 }
