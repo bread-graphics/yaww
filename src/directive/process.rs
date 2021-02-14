@@ -4,8 +4,10 @@ use super::Directive;
 use crate::{
     brush::Brush,
     cursor::Cursor,
+    gdiobj::GdiObject,
     icon::Icon,
     menu::Menu,
+    pen::{Pen, PenStyle},
     task::ServerTask,
     window::{ExtendedWindowStyle, Window, WindowStyle},
     window_class::ClassStyle,
@@ -19,7 +21,11 @@ use std::{
     process::abort,
     ptr,
 };
-use winapi::{ctypes::c_int, shared::windef::RECT, um::winuser};
+use winapi::{
+    ctypes::c_int,
+    shared::windef::RECT,
+    um::{wingdi, winuser},
+};
 
 impl Directive {
     #[inline]
@@ -213,7 +219,200 @@ impl Directive {
                     Ok(())
                 },
             ),
-            _ => unreachable!(),
+            Directive::SelectObject { dc, obj } => {
+                let res = unsafe {
+                    wingdi::SelectObject(dc.as_ptr().as_ptr().cast(), obj.as_ptr().as_ptr().cast())
+                };
+                task.complete::<crate::Result<GdiObject>>(match GdiObject::from_ptr(res.cast()) {
+                    Some(o) => Ok(o),
+                    None => Err(crate::Error::win32_error(Some("SelectObject"))),
+                });
+            }
+            Directive::ReleaseDc { window, dc } => {
+                unsafe {
+                    winuser::ReleaseDC(window.as_ptr().as_ptr().cast(), dc.as_ptr().as_ptr().cast())
+                };
+                task.complete::<()>(());
+            }
+            Directive::SetPixel { dc, x, y, color } => {
+                task.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::SetPixel(dc.as_ptr().as_ptr().cast(), x, y, color.colorref())
+                    } < 0
+                    {
+                        Err(crate::Error::win32_error(Some("SetPixel")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::MoveTo { dc, x, y } => {
+                task.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::MoveToEx(dc.as_ptr().as_ptr().cast(), x, y, ptr::null_mut())
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("MoveToEx")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::LineTo { dc, x, y } => {
+                task.complete::<crate::Result>(
+                    if unsafe { wingdi::LineTo(dc.as_ptr().as_ptr().cast(), x, y) } == 0 {
+                        Err(crate::Error::win32_error(Some("LineTo")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::Rectangle {
+                dc,
+                left,
+                top,
+                right,
+                bottom,
+            } => {
+                task.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::Rectangle(dc.as_ptr().as_ptr().cast(), left, top, right, bottom)
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("Rectangle")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::RoundRect {
+                dc,
+                left,
+                top,
+                right,
+                bottom,
+                width,
+                height,
+            } => {
+                task.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::RoundRect(
+                            dc.as_ptr().as_ptr().cast(),
+                            left,
+                            top,
+                            right,
+                            bottom,
+                            width,
+                            height,
+                        )
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("RoundRect")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::Ellipse {
+                dc,
+                left,
+                top,
+                right,
+                bottom,
+            } => {
+                task.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::Ellipse(dc.as_ptr().as_ptr().cast(), left, top, right, bottom)
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("Ellipse")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::BezierCurve { dc, points } => {
+                task.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::PolyBezier(
+                            dc.as_ptr().as_ptr().cast(),
+                            points.as_ptr() as *const _,
+                            points.len() as _,
+                        )
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("PolyBezier")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::Polygon { dc, points } => {
+                task.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::Polygon(
+                            dc.as_ptr().as_ptr().cast(),
+                            points.as_ptr() as *const _,
+                            points.len() as _,
+                        )
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("Polygon")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::Polyline { dc, points } => {
+                task.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::Polyline(
+                            dc.as_ptr().as_ptr().cast(),
+                            points.as_ptr() as *const _,
+                            points.len() as _,
+                        )
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("Polyline")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::CreatePen {
+                style,
+                width,
+                color,
+            } => {
+                let style = match style {
+                    PenStyle::Solid => wingdi::PS_SOLID,
+                    PenStyle::Dash => wingdi::PS_DASH,
+                    PenStyle::Dot => wingdi::PS_DOT,
+                    PenStyle::DashDot => wingdi::PS_DASHDOT,
+                    PenStyle::DashDotDot => wingdi::PS_DASHDOTDOT,
+                    PenStyle::Null => wingdi::PS_NULL,
+                    PenStyle::InsideFrame => wingdi::PS_INSIDEFRAME,
+                };
+                let res = unsafe { wingdi::CreatePen(style as _, width, color.colorref()) };
+
+                task.complete::<crate::Result<Pen>>(match Pen::from_ptr(res.cast()) {
+                    Some(p) => Ok(p),
+                    None => Err(crate::Error::win32_error(Some("CreatePen"))),
+                });
+            }
+            Directive::CreateSolidBrush(color) => {
+                let res = unsafe { wingdi::CreateSolidBrush(color.colorref()) };
+
+                task.complete::<crate::Result<Brush>>(match Brush::from_ptr(res.cast()) {
+                    Some(b) => Ok(b),
+                    None => Err(crate::Error::win32_error(Some("CreateSolidBrush"))),
+                });
+            }
+            Directive::DeleteObject { obj } => {
+                unsafe { wingdi::DeleteObject(obj.as_ptr().as_ptr().cast()) };
+                task.complete::<()>(());
+            }
+            directive => unreachable!("Got illegal directive: {:?}", directive),
         }
     }
 }

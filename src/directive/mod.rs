@@ -4,14 +4,19 @@ mod process;
 
 use crate::{
     brush::Brush,
+    color::Color,
     cursor::Cursor,
+    dc::Dc,
     event::Event,
+    gdiobj::GdiObject,
     icon::Icon,
     menu::Menu,
+    pen::PenStyle,
     server::GuiThread,
     util::DebugContainer,
     window::{ExtendedWindowStyle, ShowWindowCommand, Window, WindowStyle},
     window_class::ClassStyle,
+    Point,
 };
 use std::{borrow::Cow, ffi::CStr};
 use winapi::ctypes::c_int;
@@ -76,5 +81,81 @@ pub(crate) enum Directive {
     SetWindowText {
         window: Window,
         text: Cow<'static, CStr>,
+    },
+
+    // dc functions
+    SelectObject {
+        dc: Dc,
+        obj: GdiObject,
+    },
+    ReleaseDc {
+        window: Window,
+        dc: Dc,
+    },
+    SetPixel {
+        dc: Dc,
+        x: c_int,
+        y: c_int,
+        color: Color,
+    },
+    MoveTo {
+        dc: Dc,
+        x: c_int,
+        y: c_int,
+    },
+    LineTo {
+        dc: Dc,
+        x: c_int,
+        y: c_int,
+    },
+    Rectangle {
+        dc: Dc,
+        left: c_int,
+        top: c_int,
+        right: c_int,
+        bottom: c_int,
+    },
+    RoundRect {
+        dc: Dc,
+        left: c_int,
+        top: c_int,
+        right: c_int,
+        bottom: c_int,
+        width: c_int,
+        height: c_int,
+    },
+    Ellipse {
+        dc: Dc,
+        left: c_int,
+        top: c_int,
+        right: c_int,
+        bottom: c_int,
+    },
+    BezierCurve {
+        dc: Dc,
+        points: Cow<'static, [Point]>,
+    },
+    Polygon {
+        dc: Dc,
+        points: Cow<'static, [Point]>,
+    },
+    Polyline {
+        dc: Dc,
+        points: Cow<'static, [Point]>,
+    },
+
+    // pen functions
+    CreatePen {
+        style: PenStyle,
+        width: c_int,
+        color: Color,
+    },
+
+    // brush functions
+    CreateSolidBrush(Color),
+
+    // gdi object functions
+    DeleteObject {
+        obj: GdiObject,
     },
 }

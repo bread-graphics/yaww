@@ -5,7 +5,8 @@ use yaww::{
     brush::DEFAULT_BRUSH,
     window::{ExtendedWindowStyle, ShowWindowCommand, WindowStyle},
     window_class::ClassStyle,
-    Event, GuiThread, Result,
+    pen::PenStyle,
+    Event, Color, GuiThread, Result,
 };
 
 const_cstr! {
@@ -50,10 +51,13 @@ fn main() -> Result {
             None,
         )?
         .wait()?;
-    let showtask = window.show(&gt, ShowWindowCommand::SHOW)?;
+    window.show(&gt, ShowWindowCommand::SHOW)?.wait();
+
+    // create a pen
+    let pen = gt.create_pen(PenStyle::Solid, 5, Color::from_rgb(0, 0, 0))?.wait()?;
 
     // set up an event handler
-    let sehtask = gt.set_event_handler(move |gt, ev| {
+    gt.set_event_handler(move |gt, ev| {
         println!("{:?}", &ev);
 
         match ev {
@@ -62,12 +66,18 @@ fn main() -> Result {
                 .unwrap()
                 .wait()
                 .unwrap(),
+            Event::Paint { dc, .. } => {
+                // paint a few shapes on the window
+                let hold_pen = dc.select_object(gt, pen).unwrap().wait().unwrap();
+                dc.ellipse(gt, 20, 20, 300, 300).unwrap().wait().unwrap();
+                dc.select_object(gt, hold_pen).unwrap().wait().unwrap();
+            }
+            Event::Quit => {
+                pen.delete(gt).unwrap().wait();
+            }
             _ => (),
         }
-    })?;
-
-    showtask.wait();
-    sehtask.wait();
+    })?.wait();
 
     gt.main_loop()?.wait();
     Ok(())

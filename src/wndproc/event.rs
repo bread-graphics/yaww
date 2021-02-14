@@ -4,7 +4,6 @@
 
 use crate::{event::Event, server::GuiThread, task::ServerTask};
 use flume::{Receiver, Sender};
-use once_cell::sync::Lazy;
 use std::thread;
 
 pub(crate) struct ThreadSafeEVH(pub *const (dyn Fn(&GuiThread, Event) + Send + Sync + 'static));
