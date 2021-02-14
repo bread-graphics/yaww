@@ -1,7 +1,10 @@
 // MIT/Apache2 License
 
-use crate::{directive::Directive, menu::Menu, server::GuiThread, task::Task, Key};
-use std::{borrow::Cow, ffi::CStr};
+use crate::{directive::Directive, menu::Menu, server::GuiThread, task::Task, Key, Rectangle};
+use std::{
+    borrow::Cow,
+    ffi::{CStr, CString},
+};
 use winapi::{ctypes::c_int, shared::minwindef::DWORD, um::winuser};
 
 pub type Window = Key;
@@ -35,6 +38,12 @@ impl GuiThread {
             menu,
         })
     }
+
+    /// Get the top-level window.
+    #[inline]
+    pub fn get_desktop_window(&self) -> crate::Result<Task<Window>> {
+        self.send_directive(Directive::GetDesktopWindow)
+    }
 }
 
 impl Window {
@@ -47,7 +56,7 @@ impl Window {
     }
 
     #[inline]
-    pub fn r#move(
+    pub fn move_window(
         self,
         gt: &GuiThread,
         x: c_int,
@@ -64,6 +73,66 @@ impl Window {
             height,
             repaint,
         })
+    }
+
+    #[inline]
+    pub fn close(self, gt: &GuiThread) -> crate::Result<Task<crate::Result>> {
+        gt.send_directive(Directive::CloseWindow(self))
+    }
+
+    #[inline]
+    pub fn get_client_rect(self, gt: &GuiThread) -> crate::Result<Task<crate::Result<Rectangle>>> {
+        gt.send_directive(Directive::GetClientRect(self))
+    }
+
+    #[inline]
+    pub fn get_window_rect(self, gt: &GuiThread) -> crate::Result<Task<crate::Result<Rectangle>>> {
+        gt.send_directive(Directive::GetWindowRect(self))
+    }
+
+    #[inline]
+    pub fn get_parent(self, gt: &GuiThread) -> crate::Result<Task<Option<Window>>> {
+        gt.send_directive(Directive::GetParent(self))
+    }
+
+    /// Get the text for a window.
+    #[inline]
+    pub fn get_window_text(self, gt: &GuiThread) -> crate::Result<Task<Option<CString>>> {
+        gt.send_directive(Directive::GetWindowText(self))
+    }
+
+    #[inline]
+    pub fn is_child_of(self, gt: &GuiThread, parent: Window) -> crate::Result<Task<bool>> {
+        gt.send_directive(Directive::IsChild {
+            parent,
+            child: self,
+        })
+    }
+
+    #[inline]
+    pub fn is_zoomed(self, gt: &GuiThread) -> crate::Result<Task<bool>> {
+        gt.send_directive(Directive::IsZoomed(self))
+    }
+
+    #[inline]
+    pub fn set_parent(
+        self,
+        gt: &GuiThread,
+        parent: Option<Window>,
+    ) -> crate::Result<Task<crate::Result<Window>>> {
+        gt.send_directive(Directive::SetParent {
+            window: self,
+            new_parent: parent,
+        })
+    }
+
+    #[inline]
+    pub fn set_window_text(
+        self,
+        gt: &GuiThread,
+        text: Cow<'static, CStr>,
+    ) -> crate::Result<Task<crate::Result>> {
+        gt.send_directive(Directive::SetWindowText { window: self, text })
     }
 }
 

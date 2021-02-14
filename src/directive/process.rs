@@ -152,6 +152,17 @@ impl Directive {
                     CString::new(buffer).ok()
                 });
             }
+            Directive::IsChild { parent, child } => task.complete::<bool>(
+                unsafe {
+                    winuser::IsChild(
+                        parent.as_ptr().as_ptr().cast(),
+                        child.as_ptr().as_ptr().cast(),
+                    )
+                } != 0,
+            ),
+            Directive::IsZoomed(window) => task.complete::<bool>(
+                unsafe { winuser::IsZoomed(window.as_ptr().as_ptr().cast()) } != 0,
+            ),
             Directive::MoveWindow {
                 window,
                 x,
@@ -172,6 +183,32 @@ impl Directive {
                 } == 0
                 {
                     Err(crate::Error::win32_error(Some("MoveWindow")))
+                } else {
+                    Ok(())
+                },
+            ),
+            Directive::SetParent { window, new_parent } => {
+                let res = unsafe {
+                    winuser::SetParent(
+                        window.as_ptr().as_ptr().cast(),
+                        match new_parent {
+                            Some(np) => np.as_ptr().as_ptr().cast(),
+                            None => ptr::null_mut(),
+                        },
+                    )
+                };
+
+                task.complete::<crate::Result<Window>>(match Window::from_ptr(res.cast()) {
+                    None => Err(crate::Error::win32_error(Some("SetParent"))),
+                    Some(res) => Ok(res),
+                });
+            }
+            Directive::SetWindowText { window, text } => task.complete::<crate::Result>(
+                if unsafe {
+                    winuser::SetWindowTextA(window.as_ptr().as_ptr().cast(), text.as_ptr())
+                } == 0
+                {
+                    Err(crate::Error::win32_error(Some("SetWindowText")))
                 } else {
                     Ok(())
                 },

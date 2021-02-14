@@ -4,9 +4,9 @@ use crate::{
     dc::Dc,
     event::{Event, SizeReason},
     server::DirectiveThreadMessage,
+    vkey::convert_vkey_to_key as convert_vkey,
     window::Window,
     window_data::WindowData,
-    vkey::convert_vkey_to_key as convert_vkey,
 };
 use std::{
     mem::{self, MaybeUninit},

@@ -65,6 +65,11 @@ pub enum Event {
         x: c_int,
         y: c_int,
     },
+    MouseMove {
+        window: Window,
+        x: c_int,
+        y: c_int,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -81,4 +86,6 @@ pub enum MouseButton {
     Left,
     Middle,
     Right,
+    X1,
+    X2,
 }

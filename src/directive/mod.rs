@@ -56,7 +56,10 @@ pub(crate) enum Directive {
     GetParent(Window),
     GetWindowRect(Window),
     GetWindowText(Window),
-    IsChild(Window),
+    IsChild {
+        parent: Window,
+        child: Window,
+    },
     IsZoomed(Window),
     MoveWindow {
         window: Window,

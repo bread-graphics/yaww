@@ -6,6 +6,7 @@
 pub mod brush;
 pub mod cursor;
 pub mod dc;
+pub mod event;
 pub mod icon;
 pub mod menu;
 pub mod task;
@@ -14,16 +15,16 @@ pub mod window_class;
 
 pub(crate) mod directive;
 pub(crate) mod error;
-pub(crate) mod event;
 pub(crate) mod future;
 pub(crate) mod key;
 pub(crate) mod server;
 pub(crate) mod util;
+pub(crate) mod vkey;
 pub(crate) mod window_data;
 pub(crate) mod wndproc;
-pub(crate) mod vkey;
 
 pub use error::*;
+pub use event::*;
 pub use key::*;
 pub use server::GuiThread;
 pub use task::Task;

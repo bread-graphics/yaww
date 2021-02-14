@@ -5,7 +5,7 @@ use yaww::{
     brush::DEFAULT_BRUSH,
     window::{ExtendedWindowStyle, ShowWindowCommand, WindowStyle},
     window_class::ClassStyle,
-    GuiThread, Result,
+    Event, GuiThread, Result,
 };
 
 const_cstr! {
@@ -53,7 +53,18 @@ fn main() -> Result {
     let showtask = window.show(&gt, ShowWindowCommand::SHOW)?;
 
     // set up an event handler
-    let sehtask = gt.set_event_handler(|_, ev| println!("{:?}", ev))?;
+    let sehtask = gt.set_event_handler(move |gt, ev| {
+        println!("{:?}", &ev);
+
+        match ev {
+            Event::KeyDown { .. } => window
+                .move_window(gt, 20, 20, 600, 600, true)
+                .unwrap()
+                .wait()
+                .unwrap(),
+            _ => (),
+        }
+    })?;
 
     showtask.wait();
     sehtask.wait();
