@@ -158,6 +158,27 @@ impl Directive {
                     CString::new(buffer).ok()
                 });
             }
+            Directive::InvalidateRect {
+                window,
+                rect,
+                erase,
+            } => task.complete::<crate::Result>(
+                if unsafe {
+                    winuser::InvalidateRect(
+                        window.as_ptr().as_ptr().cast(),
+                        match rect {
+                            Some(ref r) => r as *const Rectangle as *const _,
+                            None => ptr::null(),
+                        },
+                        if erase { 1 } else { 0 },
+                    )
+                } == 0
+                {
+                    Err(crate::Error::win32_error(Some("InvalidateRect")))
+                } else {
+                    Ok(())
+                },
+            ),
             Directive::IsChild { parent, child } => task.complete::<bool>(
                 unsafe {
                     winuser::IsChild(

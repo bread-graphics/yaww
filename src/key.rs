@@ -1,13 +1,31 @@
 // MIT/Apache2 License
 
-use std::{num::NonZeroUsize, ptr::NonNull};
+use std::{fmt, num::NonZeroUsize, ptr::NonNull};
 
 /// A key that maps to a certain Win32 object.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct Key {
     // we pretend this opaque pointer is a key, lol
     key: NonZeroUsize,
+}
+
+impl fmt::Debug for Key {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        struct WriteHex(NonZeroUsize);
+
+        impl fmt::Debug for WriteHex {
+            #[inline]
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{:#X}", self.0)
+            }
+        }
+
+        f.debug_struct("Key")
+            .field("key", &WriteHex(self.key))
+            .finish()
+    }
 }
 
 impl Key {

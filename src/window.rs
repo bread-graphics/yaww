@@ -139,6 +139,20 @@ impl Window {
     pub fn update_window(self, gt: &GuiThread) -> crate::Result<Task<crate::Result>> {
         gt.send_directive(Directive::UpdateWindow(self))
     }
+
+    #[inline]
+    pub fn invalidate_rect(
+        self,
+        gt: &GuiThread,
+        rect: Option<Rectangle>,
+        erase: bool,
+    ) -> crate::Result<Task<crate::Result>> {
+        gt.send_directive(Directive::InvalidateRect {
+            window: self,
+            rect,
+            erase,
+        })
+    }
 }
 
 bitflags::bitflags! {

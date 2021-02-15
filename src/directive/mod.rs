@@ -16,7 +16,7 @@ use crate::{
     util::DebugContainer,
     window::{ExtendedWindowStyle, ShowWindowCommand, Window, WindowStyle},
     window_class::ClassStyle,
-    Point,
+    Point, Rectangle,
 };
 use std::{borrow::Cow, ffi::CStr};
 use winapi::ctypes::c_int;
@@ -61,6 +61,11 @@ pub(crate) enum Directive {
     GetParent(Window),
     GetWindowRect(Window),
     GetWindowText(Window),
+    InvalidateRect {
+        window: Window,
+        rect: Option<Rectangle>,
+        erase: bool,
+    },
     IsChild {
         parent: Window,
         child: Window,

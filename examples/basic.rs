@@ -52,7 +52,6 @@ fn main() -> Result {
         )?
         .wait()?;
     window.show(&gt, ShowWindowCommand::SHOW)?.wait();
-    window.update_window(&gt)?.wait()?;
 
     // create a pen
     let pen = gt.create_pen(PenStyle::Solid, 5, Color::from_rgb(0, 0, 0))?.wait()?;
@@ -70,8 +69,9 @@ fn main() -> Result {
             Event::Paint { dc, .. } => {
                 // paint a few shapes on the window
                 let hold_pen = dc.select_object(gt, pen).unwrap().wait().unwrap();
-//                dc.ellipse(gt, 20, 20, 300, 300).unwrap().wait().unwrap();
-                dc.line_to(gt, 100, 100).unwrap().wait().unwrap();
+                dc.ellipse(gt, 20, 20, 300, 300).unwrap().wait().unwrap();
+                dc.move_to(gt, 20, 20).unwrap().wait().unwrap();
+                dc.line_to(gt, 300, 300).unwrap().wait().unwrap();
                 dc.select_object(gt, hold_pen).unwrap().wait().unwrap();
             }
             Event::Quit => {
@@ -81,6 +81,7 @@ fn main() -> Result {
         }
     })?.wait();
 
+    window.invalidate_rect(&gt, None, true)?.wait()?;
     gt.main_loop()?.wait();
     Ok(())
 }
