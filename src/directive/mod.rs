@@ -82,6 +82,7 @@ pub(crate) enum Directive {
         window: Window,
         text: Cow<'static, CStr>,
     },
+    UpdateWindow(Window),
 
     // dc functions
     SelectObject {

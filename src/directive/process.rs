@@ -219,6 +219,13 @@ impl Directive {
                     Ok(())
                 },
             ),
+            Directive::UpdateWindow(window) => task.complete::<crate::Result>(
+                if unsafe { winuser::UpdateWindow(window.as_ptr().as_ptr().cast()) } == 0 {
+                    Err(crate::Error::win32_error(Some("UpdateWindow")))
+                } else {
+                    Ok(())
+                },
+            ),
             Directive::SelectObject { dc, obj } => {
                 let res = unsafe {
                     wingdi::SelectObject(dc.as_ptr().as_ptr().cast(), obj.as_ptr().as_ptr().cast())

@@ -223,7 +223,7 @@ fn exchange_event(
 
             handle_event(window_data, Event::Paint { window, dc });
 
-//            unsafe { wingdi::LineTo(dc.as_ptr().as_ptr().cast(), 200, 200) };
+            //            unsafe { wingdi::LineTo(dc.as_ptr().as_ptr().cast(), 200, 200) };
 
             // end the painting process
             unsafe { winuser::EndPaint(hwnd.as_ptr(), ps.as_ptr()) };

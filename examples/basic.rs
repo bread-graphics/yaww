@@ -52,6 +52,7 @@ fn main() -> Result {
         )?
         .wait()?;
     window.show(&gt, ShowWindowCommand::SHOW)?.wait();
+    window.update_window(&gt)?.wait()?;
 
     // create a pen
     let pen = gt.create_pen(PenStyle::Solid, 5, Color::from_rgb(0, 0, 0))?.wait()?;

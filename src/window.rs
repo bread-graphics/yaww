@@ -134,6 +134,11 @@ impl Window {
     ) -> crate::Result<Task<crate::Result>> {
         gt.send_directive(Directive::SetWindowText { window: self, text })
     }
+
+    #[inline]
+    pub fn update_window(self, gt: &GuiThread) -> crate::Result<Task<crate::Result>> {
+        gt.send_directive(Directive::UpdateWindow(self))
+    }
 }
 
 bitflags::bitflags! {
