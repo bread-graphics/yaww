@@ -104,6 +104,32 @@ impl Dc {
     }
 
     #[inline]
+    pub fn chord(
+        self,
+        gt: &GuiThread,
+        rect_left: c_int,
+        rect_top: c_int,
+        rect_right: c_int,
+        rect_bottom: c_int,
+        line_x1: c_int,
+        line_y1: c_int,
+        line_x2: c_int,
+        line_y2: c_int,
+    ) -> crate::Result<Task<crate::Result>> {
+        gt.send_directive(Directive::Chord {
+            dc: self,
+            rect_left,
+            rect_top,
+            rect_right,
+            rect_bottom,
+            line_x1,
+            line_y1,
+            line_x2,
+            line_y2,
+        })
+    }
+
+    #[inline]
     pub fn bezier_curve<Pts: Into<Cow<'static, [Point]>>>(
         self,
         gt: &GuiThread,

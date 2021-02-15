@@ -14,7 +14,7 @@ pub const DEFAULT_BRUSH: Brush = unsafe {
 
 impl GuiThread {
     #[inline]
-    pub fn create_solid_brush(&self, color: Color) -> crate::Result<Task<Brush>> {
+    pub fn create_solid_brush(&self, color: Color) -> crate::Result<Task<crate::Result<Brush>>> {
         self.send_directive(Directive::CreateSolidBrush(color))
     }
 }

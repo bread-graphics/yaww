@@ -54,7 +54,15 @@ fn main() -> Result {
     window.show(&gt, ShowWindowCommand::SHOW)?.wait();
 
     // create a pen
-    let pen = gt.create_pen(PenStyle::Solid, 5, Color::from_rgb(0, 0, 0))?.wait()?;
+    let pen_task = gt.create_pen(PenStyle::Solid, 5, Color::from_rgb(0, 0, 0))?;
+
+    // create a couple of brushes
+    let red_task = gt.create_solid_brush(Color::from_rgb(255, 0, 0))?;
+    let green_task = gt.create_solid_brush(Color::from_rgb(0, 255, 0))?;
+
+    let pen = pen_task.wait()?;
+    let red = red_task.wait()?;
+    let green = green_task.wait()?;
 
     // set up an event handler
     gt.set_event_handler(move |gt, ev| {
@@ -69,10 +77,20 @@ fn main() -> Result {
             Event::Paint { dc, .. } => {
                 // paint a few shapes on the window
                 let hold_pen = dc.select_object(gt, pen).unwrap().wait().unwrap();
-                dc.ellipse(gt, 20, 20, 300, 300).unwrap().wait().unwrap();
-                dc.move_to(gt, 20, 20).unwrap().wait().unwrap();
-                dc.line_to(gt, 300, 300).unwrap().wait().unwrap();
+                let t1 = dc.ellipse(gt, 20, 20, 300, 300).unwrap();
+                let t2 = dc.move_to(gt, 20, 20).unwrap();
+                let t3 = dc.line_to(gt, 300, 300).unwrap();
+                t1.wait().unwrap();
+                t2.wait().unwrap();
+                t3.wait().unwrap();
+
+                let hold_brush = dc.select_object(gt, red).unwrap().wait().unwrap();
+                dc.chord(gt, 20, 20, 300, 300, 20, 20, 300, 300).unwrap().wait().unwrap();
+                dc.select_object(gt, green).unwrap().wait().unwrap();
+                dc.chord(gt, 20, 20, 300, 300, 300, 300, 20, 20).unwrap().wait().unwrap();
+
                 dc.select_object(gt, hold_pen).unwrap().wait().unwrap();
+                dc.select_object(gt, hold_brush).unwrap().wait().unwrap();
             }
             Event::Quit => {
                 pen.delete(gt).unwrap().wait();

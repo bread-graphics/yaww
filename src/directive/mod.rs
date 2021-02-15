@@ -137,6 +137,17 @@ pub(crate) enum Directive {
         right: c_int,
         bottom: c_int,
     },
+    Chord {
+        dc: Dc,
+        rect_left: c_int,
+        rect_top: c_int,
+        rect_right: c_int,
+        rect_bottom: c_int,
+        line_x1: c_int,
+        line_y1: c_int,
+        line_x2: c_int,
+        line_y2: c_int,
+    },
     BezierCurve {
         dc: Dc,
         points: Cow<'static, [Point]>,

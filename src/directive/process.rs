@@ -359,6 +359,38 @@ impl Directive {
                     },
                 );
             }
+            Directive::Chord {
+                dc,
+                rect_left,
+                rect_top,
+                rect_right,
+                rect_bottom,
+                line_x1,
+                line_y1,
+                line_x2,
+                line_y2,
+            } => {
+                task.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::Chord(
+                            dc.as_ptr().as_ptr().cast(),
+                            rect_left,
+                            rect_top,
+                            rect_right,
+                            rect_bottom,
+                            line_x1,
+                            line_y1,
+                            line_x2,
+                            line_y2,
+                        )
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("Chord")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
             Directive::BezierCurve { dc, points } => {
                 task.complete::<crate::Result>(
                     if unsafe {
