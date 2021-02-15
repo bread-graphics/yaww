@@ -4,13 +4,13 @@
 
 use crate::{event::Event, server::GuiThread, task::ServerTask};
 use flume::{Receiver, Sender};
-use std::thread;
+use std::{sync::Arc, thread};
 
-pub(crate) struct ThreadSafeEVH(pub *const (dyn Fn(&GuiThread, Event) + Send + Sync + 'static));
-
-unsafe impl Send for ThreadSafeEVH {}
-
-pub(crate) type TESTuple = (ThreadSafeEVH, Event, Sender<Option<ServerTask>>);
+pub(crate) type TESTuple = (
+    Arc<dyn Fn(&GuiThread, Event) + Send + Sync + 'static>,
+    Event,
+    Sender<Option<ServerTask>>,
+);
 
 #[inline]
 pub(crate) fn event_handler_handler(t: TESTuple) {
@@ -21,7 +21,7 @@ pub(crate) fn event_handler_handler(t: TESTuple) {
     let inferior = GuiThread::inferior_copy(sender);
 
     // call the event handler with the event
-    unsafe { (&*event_handler.0)(&inferior, event) };
+    unsafe { (&*event_handler)(&inferior, event) };
 
     // send a dummy task down the pipe
     inferior.into_inner().send(None).ok();

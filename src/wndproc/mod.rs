@@ -273,11 +273,10 @@ fn handle_event(window_data: &WindowData, event: Event) {
     window_data.task_send.send(None).ok();
 
     // offload the event handler onto the directive processing thread
-    let event_handler_ptr = event::ThreadSafeEVH(&*r);
     window_data
         .dt_action
         .send(DirectiveThreadMessage::ProcessEvent((
-            event_handler_ptr,
+            r.clone(),
             event,
             window_data.task_send.clone(),
         )))
@@ -285,14 +284,19 @@ fn handle_event(window_data: &WindowData, event: Event) {
 
     // begin processing events in this thread until the event handler finishes
     loop {
+        log::trace!("Beginning process task");
         match window_data.task_recv.recv() {
             // Ok(None) indicates it's time to stop
-            Ok(None) | Err(_) => break,
+            Ok(None) | Err(_) => {
+                log::trace!("Ending process task miniloop");
+                break;
+            }
             Ok(Some(tsk)) => {
                 let directive = tsk.directive();
                 directive.process(&window_data, tsk);
             }
         }
+        log::trace!("Ending process task");
     }
 
     window_data

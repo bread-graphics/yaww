@@ -6,7 +6,10 @@ use std::{
     cell::{Cell, RefCell},
     mem::{self, MaybeUninit},
     ptr::{self, NonNull},
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     thread,
 };
 use winapi::{
@@ -39,7 +42,7 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
                 dt_action,
                 task_send: sender,
                 task_recv: recv.clone(),
-                event_handler: RefCell::new(Box::new(|_, ev| {
+                event_handler: RefCell::new(Arc::new(|_, ev| {
                     log::warn!("Event ignored: {:?}", ev)
                 })),
             };

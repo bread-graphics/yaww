@@ -22,7 +22,7 @@ pub(crate) struct WindowData {
     // used to send dummy tasks
     pub task_send: Sender<Option<ServerTask>>,
     // container for the event handler
-    pub event_handler: RefCell<Box<dyn Fn(&GuiThread, Event) + Send + Sync + 'static>>,
+    pub event_handler: RefCell<Arc<dyn Fn(&GuiThread, Event) + Send + Sync + 'static>>,
     // the waiting task we notify once the loop is complete
     pub waiter: RefCell<Option<ServerTask>>,
 }

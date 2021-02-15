@@ -61,7 +61,7 @@ impl Directive {
                     .event_handler
                     .try_borrow_mut()
                     .expect("Tried to set event handler while processing event") =
-                    event_handler.into_inner();
+                    event_handler.into_inner().into();
                 task.complete::<()>(());
             }
             Directive::BeginWait => {

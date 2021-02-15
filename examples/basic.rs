@@ -16,7 +16,7 @@ const_cstr! {
 
 fn main() -> Result {
     env_logger::Builder::new()
-        .filter(Some("yaww"), log::LevelFilter::Debug)
+        .filter(Some("yaww"), log::LevelFilter::Trace)
         .init();
 
     // create the gui thread
