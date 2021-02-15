@@ -213,6 +213,8 @@ fn exchange_event(
             let mut ps = MaybeUninit::<winuser::PAINTSTRUCT>::uninit();
             let dc = unsafe { winuser::BeginPaint(hwnd.as_ptr(), ps.as_mut_ptr()) };
 
+            unsafe { wingdi::LineTo(dc, 300, 300) };
+
             // if we can't paint, not much we can do
             let dc = match Dc::from_ptr(dc.cast()) {
                 Some(dc) => dc,
@@ -220,6 +222,8 @@ fn exchange_event(
             };
 
             handle_event(window_data, Event::Paint { window, dc });
+
+//            unsafe { wingdi::LineTo(dc.as_ptr().as_ptr().cast(), 200, 200) };
 
             // end the painting process
             unsafe { winuser::EndPaint(hwnd.as_ptr(), ps.as_ptr()) };

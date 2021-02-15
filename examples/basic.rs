@@ -69,7 +69,8 @@ fn main() -> Result {
             Event::Paint { dc, .. } => {
                 // paint a few shapes on the window
                 let hold_pen = dc.select_object(gt, pen).unwrap().wait().unwrap();
-                dc.ellipse(gt, 20, 20, 300, 300).unwrap().wait().unwrap();
+//                dc.ellipse(gt, 20, 20, 300, 300).unwrap().wait().unwrap();
+                dc.line_to(gt, 100, 100).unwrap().wait().unwrap();
                 dc.select_object(gt, hold_pen).unwrap().wait().unwrap();
             }
             Event::Quit => {
