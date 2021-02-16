@@ -291,7 +291,7 @@ fn handle_event(window_data: &WindowData, event: Event) {
                 log::trace!("Ending process task miniloop");
                 break;
             }
-            Ok(Some(tsk)) => {
+            Ok(Some(mut tsk)) => {
                 let directive = tsk.directive();
                 directive.process(&window_data, tsk);
             }

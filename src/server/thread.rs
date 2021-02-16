@@ -131,7 +131,7 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
                             // reconstruct the task from the lparam pointer
                             // SAFETY: unchecked because if we have YAWW_SRVTASK we know it's us
                             let taskptr = msg.lParam as *mut ServerTask;
-                            let task = unsafe { Box::from_raw(taskptr) };
+                            let mut task = unsafe { Box::from_raw(taskptr) };
 
                             // try to get the directive from the task
                             let directive = task.directive();

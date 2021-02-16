@@ -1,108 +1,60 @@
 // MIT/Apache2 License
 
 use crate::directive::Directive;
+use flume::{r#async::RecvFut, Receiver, Sender};
 use std::{
     any::Any,
     future::Future,
+    mem,
     pin::Pin,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
-    },
     task::{Context, Poll, Waker},
-    thread::{self, Thread},
 };
 
-enum DirectiveOrOutput<T> {
-    Directive(Directive),
-    Output(T),
+pub struct Task<T: 'static>(TaskInner<T>);
+
+enum TaskInner<T: 'static> {
+    Recv(Receiver<T>),
+    RFuture(RecvFut<'static, T>),
+    Transitional,
 }
 
-enum ThreadOrWaker {
-    Thread(Thread),
-    Waker(Waker),
+pub(crate) struct ServerTask {
+    inner: Box<dyn ServerTaskInnerGeneric + Send + Sync + 'static>,
 }
 
-/// The inner container defining the task.
-struct Inner<T: Any + Send + Sync + 'static> {
-    // fine using spinlocks because in most cases they shouldn't be contended
-    d_or_o: Mutex<Option<DirectiveOrOutput<T>>>,
-    t_or_w: Mutex<Option<ThreadOrWaker>>,
+struct ServerTaskInner<T: 'static> {
+    send: Sender<T>,
+    directive: Option<Directive>,
 }
 
-impl<T: Any + Send + Sync + 'static> Inner<T> {
+trait ServerTaskInnerGeneric {
+    fn complete(&self, item: Box<dyn Any + Send + Sync + 'static>);
+    fn directive(&mut self) -> Directive;
+}
+
+impl<T: Any + Send + Sync + 'static> ServerTaskInnerGeneric for ServerTaskInner<T> {
     #[inline]
-    fn is_complete(&self) -> Option<T> {
-        let mut l = self.d_or_o.lock().unwrap();
-        match &mut *l {
-            None => None,
-            Some(DirectiveOrOutput::Directive(_)) => None,
-            Some(DirectiveOrOutput::Output(_)) => Some(match l.take() {
-                Some(DirectiveOrOutput::Output(o)) => o,
-                _ => unreachable!(),
-            }),
-        }
-    }
-
-    #[inline]
-    fn wake(&self) {
-        match self.t_or_w.lock().unwrap().take() {
-            Some(ThreadOrWaker::Thread(t)) => t.unpark(),
-            Some(ThreadOrWaker::Waker(w)) => w.wake(),
-            None => (),
-        }
-    }
-}
-
-trait InnerGeneric {
-    fn directive(&self) -> Directive;
-    fn set_output(&self, output: Box<dyn Any + Send + 'static>);
-}
-
-impl<T: Any + Send + Sync + 'static> InnerGeneric for Inner<T> {
-    #[inline]
-    fn directive(&self) -> Directive {
-        match self.d_or_o.lock().unwrap().take() {
-            Some(DirectiveOrOutput::Directive(d)) => d,
-            _ => panic!("Already pulled directive from task"),
-        }
-    }
-
-    #[inline]
-    fn set_output(&self, output: Box<dyn Any + Send + 'static>) {
-        let output: T = match output.downcast::<T>() {
-            Ok(output) => *output,
-            Err(_) => panic!("Unable to derive the actual type of output"),
+    fn complete(&self, item: Box<dyn Any + Send + Sync + 'static>) {
+        let item: T = match Box::<dyn Any + Send + 'static>::downcast::<T>(item) {
+            Ok(item) => *item,
+            Err(_) => panic!("Item type mismatch"),
         };
 
-        *self.d_or_o.lock().unwrap() = Some(DirectiveOrOutput::Output(output));
-        self.wake();
+        self.send.try_send(item).ok();
     }
-}
 
-/// A task represents an ongoing operation being done by the GUI server.
-pub struct Task<T: Any + Send + Sync + 'static> {
-    inner: Arc<Inner<T>>,
-}
-
-/// The server-facing side of the task.
-pub(crate) struct ServerTask {
-    // this pointer is actually an Arc<Inner<T>>, but type-erased
-    inner: Arc<dyn InnerGeneric + Send + Sync + 'static>,
+    #[inline]
+    fn directive(&mut self) -> Directive {
+        self.directive.take().unwrap()
+    }
 }
 
 impl<T: Any + Send + Sync + 'static> Task<T> {
-    /// Wait for the task to resolve to a real result by parking the current thread and waiting.
     #[inline]
     pub fn wait(self) -> T {
-        // park until completion
-        loop {
-            if let Some(val) = self.inner.is_complete() {
-                break val;
-            }
-
-            *self.inner.t_or_w.lock().unwrap() = Some(ThreadOrWaker::Thread(thread::current()));
-            thread::park();
+        match self.0 {
+            TaskInner::Recv(r) => r.recv().unwrap(),
+            _ => unreachable!(),
         }
     }
 }
@@ -112,41 +64,51 @@ impl<T: Any + Send + Sync + 'static> Future for Task<T> {
 
     #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<T> {
-        // set the waker
-        if let Some(val) = self.inner.is_complete() {
-            Poll::Ready(val)
-        } else {
-            *self.inner.t_or_w.lock().unwrap() = Some(ThreadOrWaker::Waker(cx.waker().clone()));
-            Poll::Pending
+        let this = self.get_mut();
+        loop {
+            match this.0 {
+                TaskInner::Recv(ref mut r) => {
+                    let m = mem::replace(&mut this.0, TaskInner::Transitional);
+                    match m {
+                        TaskInner::Recv(r) => *this = Task(TaskInner::RFuture(r.into_recv_async())),
+                        _ => unreachable!(),
+                    }
+                }
+                TaskInner::RFuture(ref mut r) => {
+                    let mut p = Pin::new(r);
+                    return match p.as_mut().poll(cx) {
+                        Poll::Ready(p) => Poll::Ready(p.unwrap()),
+                        Poll::Pending => Poll::Pending,
+                    };
+                }
+                _ => unreachable!(),
+            }
         }
     }
 }
 
 impl ServerTask {
-    /// Pull the directive from this task.
     #[inline]
-    pub fn directive(&self) -> Directive {
-        self.inner.directive()
+    pub fn complete<T: Any + Send + Sync + 'static>(self, item: T) {
+        self.inner.complete(Box::new(item));
     }
 
-    /// Complete the task.
     #[inline]
-    pub fn complete<T: Any + Send + Sync + 'static>(self, val: T) {
-        self.inner.set_output(Box::new(val));
+    pub fn directive(&mut self) -> Directive {
+        self.inner.directive()
     }
 }
 
 pub(crate) fn create_task<T: Any + Send + Sync + 'static>(
     directive: Directive,
 ) -> (Task<T>, ServerTask) {
-    let inner = Arc::new(Inner {
-        d_or_o: Mutex::new(Some(DirectiveOrOutput::Directive(directive))),
-        t_or_w: Mutex::new(None),
-    });
-
+    let (send, recv) = flume::bounded(1);
+    let task = Task(TaskInner::Recv(recv));
     let srvtask = ServerTask {
-        inner: inner.clone(),
+        inner: Box::new(ServerTaskInner {
+            send,
+            directive: Some(directive),
+        }),
     };
-    let task = Task { inner };
     (task, srvtask)
 }
