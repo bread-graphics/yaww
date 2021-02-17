@@ -6,7 +6,7 @@ pub type GdiObject = Key;
 
 impl GdiObject {
     #[inline]
-    pub fn delete(self, gt: &GuiThread) -> crate::Result<Task<()>> {
+    pub fn delete_gdi(self, gt: &GuiThread) -> crate::Result<Task<()>> {
         gt.send_directive(Directive::DeleteObject { obj: self })
     }
 }

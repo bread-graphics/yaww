@@ -5,6 +5,7 @@ use crate::{
     brush::Brush,
     cursor::Cursor,
     gdiobj::GdiObject,
+    glrc::{GlProc, Glrc},
     icon::Icon,
     menu::Menu,
     pen::{Pen, PenStyle},
@@ -19,7 +20,7 @@ use std::{
     ffi::{CStr, CString},
     mem,
     process::abort,
-    ptr,
+    ptr::{self, NonNull},
 };
 use winapi::{
     ctypes::c_int,
@@ -66,6 +67,10 @@ impl Directive {
             }
             Directive::BeginWait => {
                 *window_data.waiter.borrow_mut() = Some(task);
+            }
+            Directive::RunFunction(rf) => {
+                (rf.into_inner())();
+                task.complete::<()>(());
             }
             Directive::RegisterClass {
                 style,
@@ -439,6 +444,13 @@ impl Directive {
                     },
                 );
             }
+            Directive::SwapBuffers(dc) => task.complete::<crate::Result>(
+                if unsafe { wingdi::SwapBuffers(dc.as_ptr().as_ptr().cast()) } == 0 {
+                    Err(crate::Error::win32_error(Some("SwapBuffers")))
+                } else {
+                    Ok(())
+                },
+            ),
             Directive::CreatePen {
                 style,
                 width,
@@ -471,6 +483,49 @@ impl Directive {
             Directive::DeleteObject { obj } => {
                 unsafe { wingdi::DeleteObject(obj.as_ptr().as_ptr().cast()) };
                 task.complete::<()>(());
+            }
+            Directive::CreateWglContext(dc) => {
+                task.complete::<crate::Result<Glrc>>(
+                    match Glrc::from_ptr(
+                        unsafe { wingdi::wglCreateContext(dc.as_ptr().as_ptr().cast()) }.cast(),
+                    ) {
+                        Some(res) => Ok(res),
+                        None => Err(crate::Error::win32_error(Some("wglCreateContext"))),
+                    },
+                );
+            }
+            Directive::MakeWglCurrent { dc, rc } => {
+                let dc = match dc {
+                    Some(dc) => unsafe { dc.as_ptr() }.as_ptr(),
+                    None => ptr::null_mut(),
+                };
+                let rc = match rc {
+                    Some(rc) => unsafe { rc.as_ptr() }.as_ptr(),
+                    None => ptr::null_mut(),
+                };
+
+                task.complete::<crate::Result>(
+                    if unsafe { wingdi::wglMakeCurrent(dc.cast(), rc.cast()) } == 0 {
+                        Err(crate::Error::win32_error(Some("wglMakeCurrent")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::DestroyWglContext(rc) => task.complete::<crate::Result>(
+                if unsafe { wingdi::wglDeleteContext(rc.as_ptr().as_ptr().cast()) } == 0 {
+                    Err(crate::Error::win32_error(Some("wglDeleteContext")))
+                } else {
+                    Ok(())
+                },
+            ),
+            Directive::GetWglProcAddress(name) => {
+                task.complete::<Option<GlProc>>(
+                    match NonNull::new(unsafe { wingdi::wglGetProcAddress(name.as_ptr()) }) {
+                        Some(glproc) => Some(unsafe { GlProc::new(glproc.cast()) }),
+                        None => None,
+                    },
+                );
             }
             directive => unreachable!("Got illegal directive: {:?}", directive),
         }

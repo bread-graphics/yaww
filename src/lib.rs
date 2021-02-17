@@ -9,6 +9,7 @@ pub mod cursor;
 pub mod dc;
 pub mod event;
 pub mod gdiobj;
+pub mod glrc;
 pub mod icon;
 pub mod menu;
 pub mod pen;

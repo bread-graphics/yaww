@@ -6,9 +6,10 @@ use crate::{
     brush::Brush,
     color::Color,
     cursor::Cursor,
-    dc::Dc,
+    dc::{Dc, PixelFormat},
     event::Event,
     gdiobj::GdiObject,
+    glrc::Glrc,
     icon::Icon,
     menu::Menu,
     pen::PenStyle,
@@ -26,6 +27,10 @@ pub(crate) enum Directive {
     // utility functions
     SetEventHandler(DebugContainer<Box<dyn Fn(&GuiThread, Event) + Send + Sync + 'static>>),
     BeginWait,
+
+    // useful for direct2d, where we might need to run a blocking function in a threadpool... except we already
+    // have a threadpool here
+    RunFunction(DebugContainer<Box<dyn FnOnce() + Send + Sync + 'static>>),
 
     // class functions
     RegisterClass {
@@ -160,6 +165,7 @@ pub(crate) enum Directive {
         dc: Dc,
         points: Cow<'static, [Point]>,
     },
+    SwapBuffers(Dc),
 
     // pen functions
     CreatePen {
@@ -175,4 +181,22 @@ pub(crate) enum Directive {
     DeleteObject {
         obj: GdiObject,
     },
+
+    // wgl functions
+    ChoosePixelFormat {
+        dc: Dc,
+        pixel_format: Cow<'static, PixelFormat>,
+    },
+    SetPixelFormat {
+        dc: Dc,
+        format_id: c_int,
+        pixel_format: Cow<'static, PixelFormat>,
+    },
+    CreateWglContext(Dc),
+    MakeWglCurrent {
+        dc: Option<Dc>,
+        rc: Option<Glrc>,
+    },
+    DestroyWglContext(Glrc),
+    GetWglProcAddress(Cow<'static, CStr>),
 }

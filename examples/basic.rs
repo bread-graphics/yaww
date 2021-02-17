@@ -93,7 +93,7 @@ fn main() -> Result {
                 dc.select_object(gt, hold_brush).unwrap().wait().unwrap();
             }
             Event::Quit => {
-                pen.delete(gt).unwrap().wait();
+                pen.delete_gdi(gt).unwrap().wait();
             }
             _ => (),
         }
