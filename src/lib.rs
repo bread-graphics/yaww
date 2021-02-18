@@ -27,6 +27,11 @@ pub(crate) mod vkey;
 pub(crate) mod window_data;
 pub(crate) mod wndproc;
 
+//#[cfg(feature = "direct2d")]
+//pub mod d2d1;
+//#[cfg(feature = "direct2d")]
+//pub(crate) mod ptr;
+
 pub use color::*;
 pub use error::*;
 pub use event::*;

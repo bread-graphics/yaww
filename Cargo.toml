@@ -20,4 +20,4 @@ env_logger = { version = "0.8.2", default-features = false, features = ["atty", 
 
 [features]
 default = []
-direct2d = ["winapi/d2d1"]
+direct2d = ["winapi/d2d1", "winapi/unknwnbase"]

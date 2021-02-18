@@ -41,6 +41,14 @@ impl GuiThread {
         self.task_sender
     }
 
+    #[cfg(feature = "direct2d")]
+    #[inline]
+    pub fn as_inferior(&self) -> Self {
+        Self {
+            task_sender: task_sender.clone(),
+        }
+    }
+
     /// Send a directive to the GUI thread and get a task bask to wait on.
     #[inline]
     pub(crate) fn send_directive<T: Any + Send + Sync + 'static>(
