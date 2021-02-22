@@ -192,9 +192,8 @@ impl Directive {
                     )
                 } != 0,
             ),
-            Directive::IsZoomed(window) => task.send::<bool>(
-                unsafe { winuser::IsZoomed(window.as_ptr().as_ptr().cast()) } != 0,
-            ),
+            Directive::IsZoomed(window) => task
+                .send::<bool>(unsafe { winuser::IsZoomed(window.as_ptr().as_ptr().cast()) } != 0),
             Directive::MoveWindow {
                 window,
                 x,

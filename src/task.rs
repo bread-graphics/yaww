@@ -1,10 +1,10 @@
 // MIT/Apache2 License
 
 use crate::directive::Directive;
+use orphan_crippler::{two, Receiver, Sender};
 use std::any::Any;
-use orphan_crippler::{Sender, Receiver, two};
 
-pub type Task<T> = Receiver<T>; 
+pub type Task<T> = Receiver<T>;
 pub(crate) type ServerTask = Sender<Directive>;
 
 #[inline]

@@ -9,7 +9,7 @@ bitflags = "1.2.1"
 flume = { version = "0.10", default-features = false, features = ["async"] }
 gluten-keyboard = "0.1"
 log = "0.4"
-orphan-crippler = "0.1"
+orphan-crippler = "0.1.1"
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
