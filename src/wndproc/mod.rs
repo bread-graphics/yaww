@@ -292,7 +292,7 @@ fn handle_event(window_data: &WindowData, event: Event) {
                 break;
             }
             Ok(Some(mut tsk)) => {
-                let directive = tsk.directive();
+                let directive = tsk.input().unwrap();
                 directive.process(&window_data, tsk);
             }
         }

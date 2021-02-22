@@ -134,7 +134,7 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
                             let mut task = unsafe { Box::from_raw(taskptr) };
 
                             // try to get the directive from the task
-                            let directive = task.directive();
+                            let directive = task.input().unwrap();
 
                             // process the directive
                             directive.process(&window_data, *task);
@@ -152,7 +152,7 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
             // before we die, unwait the thread, absorb the error
             let mut waiter = window_data.waiter.borrow_mut();
             if let Some(waiter) = waiter.take() {
-                waiter.complete::<()>(());
+                waiter.send::<()>(());
             }
             mem::drop(waiter);
         })

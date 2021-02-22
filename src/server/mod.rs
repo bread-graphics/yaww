@@ -45,7 +45,7 @@ impl GuiThread {
     #[inline]
     pub fn as_inferior(&self) -> Self {
         Self {
-            task_sender: task_sender.clone(),
+            task_sender: self.task_sender.clone(),
         }
     }
 

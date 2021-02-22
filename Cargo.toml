@@ -9,6 +9,7 @@ bitflags = "1.2.1"
 flume = { version = "0.10", default-features = false, features = ["async"] }
 gluten-keyboard = "0.1"
 log = "0.4"
+orphan-crippler = "0.1"
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
@@ -21,3 +22,4 @@ env_logger = { version = "0.8.2", default-features = false, features = ["atty", 
 [features]
 default = []
 direct2d = ["winapi/d2d1", "winapi/unknwnbase"]
+parking_lot = ["orphan-crippler/parking_lot"]

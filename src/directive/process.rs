@@ -39,7 +39,7 @@ impl Directive {
                     right: 0,
                     bottom: 0,
                 };
-                $task.complete::<crate::Result<Rectangle>>(
+                $task.send::<crate::Result<Rectangle>>(
                     if unsafe {
                         winuser::$fname(
                             $window.as_ptr().as_ptr().cast(),
@@ -63,14 +63,14 @@ impl Directive {
                     .try_borrow_mut()
                     .expect("Tried to set event handler while processing event") =
                     event_handler.into_inner().into();
-                task.complete::<()>(());
+                task.send::<()>(());
             }
             Directive::BeginWait => {
                 *window_data.waiter.borrow_mut() = Some(task);
             }
             Directive::RunFunction(rf) => {
                 (rf.into_inner())();
-                task.complete::<()>(());
+                task.send::<()>(());
             }
             Directive::RegisterClass {
                 style,
@@ -81,7 +81,7 @@ impl Directive {
                 class_name,
                 menu_name,
             } => {
-                task.complete::<crate::Result>(register_class(
+                task.send::<crate::Result>(register_class(
                     style,
                     icon,
                     small_icon,
@@ -102,7 +102,7 @@ impl Directive {
                 height,
                 parent,
                 menu,
-            } => task.complete::<crate::Result<Window>>(create_window(
+            } => task.send::<crate::Result<Window>>(create_window(
                 window_data,
                 &*class_name,
                 window_name.as_deref(),
@@ -117,9 +117,9 @@ impl Directive {
             )),
             Directive::ShowWindow { window, command } => {
                 unsafe { winuser::ShowWindow(window.as_ptr().as_ptr().cast(), command.bits()) };
-                task.complete::<()>(());
+                task.send::<()>(());
             }
-            Directive::CloseWindow(window) => task.complete::<crate::Result>(
+            Directive::CloseWindow(window) => task.send::<crate::Result>(
                 if unsafe { winuser::CloseWindow(window.as_ptr().as_ptr().cast()) } == 0 {
                     Err(crate::Error::win32_error(Some("CloseWindow")))
                 } else {
@@ -132,7 +132,7 @@ impl Directive {
             Directive::GetDesktopWindow => {
                 let res = unsafe { winuser::GetDesktopWindow() };
                 // if this fails, something is seriously fucked up
-                task.complete::<Window>(
+                task.send::<Window>(
                     Window::from_ptr(res.cast()).expect("Desktop window does not exist"),
                 );
             }
@@ -140,7 +140,7 @@ impl Directive {
                 complete_with_rectangle!(task, window, GetWindowRect);
             }
             Directive::GetParent(window) => {
-                task.complete::<Option<Window>>(Window::from_ptr(unsafe {
+                task.send::<Option<Window>>(Window::from_ptr(unsafe {
                     winuser::GetParent(window.as_ptr().as_ptr().cast()).cast()
                 }));
             }
@@ -156,7 +156,7 @@ impl Directive {
                     )
                 };
 
-                task.complete::<Option<CString>>(if textlen <= 0 {
+                task.send::<Option<CString>>(if textlen <= 0 {
                     None
                 } else {
                     unsafe { buffer.set_len(textlen as usize - 1) };
@@ -167,7 +167,7 @@ impl Directive {
                 window,
                 rect,
                 erase,
-            } => task.complete::<crate::Result>(
+            } => task.send::<crate::Result>(
                 if unsafe {
                     winuser::InvalidateRect(
                         window.as_ptr().as_ptr().cast(),
@@ -184,7 +184,7 @@ impl Directive {
                     Ok(())
                 },
             ),
-            Directive::IsChild { parent, child } => task.complete::<bool>(
+            Directive::IsChild { parent, child } => task.send::<bool>(
                 unsafe {
                     winuser::IsChild(
                         parent.as_ptr().as_ptr().cast(),
@@ -192,7 +192,7 @@ impl Directive {
                     )
                 } != 0,
             ),
-            Directive::IsZoomed(window) => task.complete::<bool>(
+            Directive::IsZoomed(window) => task.send::<bool>(
                 unsafe { winuser::IsZoomed(window.as_ptr().as_ptr().cast()) } != 0,
             ),
             Directive::MoveWindow {
@@ -202,7 +202,7 @@ impl Directive {
                 width,
                 height,
                 repaint,
-            } => task.complete::<crate::Result>(
+            } => task.send::<crate::Result>(
                 if unsafe {
                     winuser::MoveWindow(
                         window.as_ptr().as_ptr().cast(),
@@ -230,12 +230,12 @@ impl Directive {
                     )
                 };
 
-                task.complete::<crate::Result<Window>>(match Window::from_ptr(res.cast()) {
+                task.send::<crate::Result<Window>>(match Window::from_ptr(res.cast()) {
                     None => Err(crate::Error::win32_error(Some("SetParent"))),
                     Some(res) => Ok(res),
                 });
             }
-            Directive::SetWindowText { window, text } => task.complete::<crate::Result>(
+            Directive::SetWindowText { window, text } => task.send::<crate::Result>(
                 if unsafe {
                     winuser::SetWindowTextA(window.as_ptr().as_ptr().cast(), text.as_ptr())
                 } == 0
@@ -245,7 +245,7 @@ impl Directive {
                     Ok(())
                 },
             ),
-            Directive::UpdateWindow(window) => task.complete::<crate::Result>(
+            Directive::UpdateWindow(window) => task.send::<crate::Result>(
                 if unsafe { winuser::UpdateWindow(window.as_ptr().as_ptr().cast()) } == 0 {
                     Err(crate::Error::win32_error(Some("UpdateWindow")))
                 } else {
@@ -256,7 +256,7 @@ impl Directive {
                 let res = unsafe {
                     wingdi::SelectObject(dc.as_ptr().as_ptr().cast(), obj.as_ptr().as_ptr().cast())
                 };
-                task.complete::<crate::Result<GdiObject>>(match GdiObject::from_ptr(res.cast()) {
+                task.send::<crate::Result<GdiObject>>(match GdiObject::from_ptr(res.cast()) {
                     Some(o) => Ok(o),
                     None => Err(crate::Error::win32_error(Some("SelectObject"))),
                 });
@@ -265,10 +265,10 @@ impl Directive {
                 unsafe {
                     winuser::ReleaseDC(window.as_ptr().as_ptr().cast(), dc.as_ptr().as_ptr().cast())
                 };
-                task.complete::<()>(());
+                task.send::<()>(());
             }
             Directive::SetPixel { dc, x, y, color } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe {
                         wingdi::SetPixel(dc.as_ptr().as_ptr().cast(), x, y, color.colorref())
                     } < 0
@@ -280,7 +280,7 @@ impl Directive {
                 );
             }
             Directive::MoveTo { dc, x, y } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe {
                         wingdi::MoveToEx(dc.as_ptr().as_ptr().cast(), x, y, ptr::null_mut())
                     } == 0
@@ -292,7 +292,7 @@ impl Directive {
                 );
             }
             Directive::LineTo { dc, x, y } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe { wingdi::LineTo(dc.as_ptr().as_ptr().cast(), x, y) } == 0 {
                         Err(crate::Error::win32_error(Some("LineTo")))
                     } else {
@@ -307,7 +307,7 @@ impl Directive {
                 right,
                 bottom,
             } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe {
                         wingdi::Rectangle(dc.as_ptr().as_ptr().cast(), left, top, right, bottom)
                     } == 0
@@ -327,7 +327,7 @@ impl Directive {
                 width,
                 height,
             } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe {
                         wingdi::RoundRect(
                             dc.as_ptr().as_ptr().cast(),
@@ -353,7 +353,7 @@ impl Directive {
                 right,
                 bottom,
             } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe {
                         wingdi::Ellipse(dc.as_ptr().as_ptr().cast(), left, top, right, bottom)
                     } == 0
@@ -375,7 +375,7 @@ impl Directive {
                 line_x2,
                 line_y2,
             } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe {
                         wingdi::Chord(
                             dc.as_ptr().as_ptr().cast(),
@@ -397,7 +397,7 @@ impl Directive {
                 );
             }
             Directive::BezierCurve { dc, points } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe {
                         wingdi::PolyBezier(
                             dc.as_ptr().as_ptr().cast(),
@@ -413,7 +413,7 @@ impl Directive {
                 );
             }
             Directive::Polygon { dc, points } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe {
                         wingdi::Polygon(
                             dc.as_ptr().as_ptr().cast(),
@@ -429,7 +429,7 @@ impl Directive {
                 );
             }
             Directive::Polyline { dc, points } => {
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe {
                         wingdi::Polyline(
                             dc.as_ptr().as_ptr().cast(),
@@ -444,7 +444,7 @@ impl Directive {
                     },
                 );
             }
-            Directive::SwapBuffers(dc) => task.complete::<crate::Result>(
+            Directive::SwapBuffers(dc) => task.send::<crate::Result>(
                 if unsafe { wingdi::SwapBuffers(dc.as_ptr().as_ptr().cast()) } == 0 {
                     Err(crate::Error::win32_error(Some("SwapBuffers")))
                 } else {
@@ -467,7 +467,7 @@ impl Directive {
                 };
                 let res = unsafe { wingdi::CreatePen(style as _, width, color.colorref()) };
 
-                task.complete::<crate::Result<Pen>>(match Pen::from_ptr(res.cast()) {
+                task.send::<crate::Result<Pen>>(match Pen::from_ptr(res.cast()) {
                     Some(p) => Ok(p),
                     None => Err(crate::Error::win32_error(Some("CreatePen"))),
                 });
@@ -475,17 +475,17 @@ impl Directive {
             Directive::CreateSolidBrush(color) => {
                 let res = unsafe { wingdi::CreateSolidBrush(color.colorref()) };
 
-                task.complete::<crate::Result<Brush>>(match Brush::from_ptr(res.cast()) {
+                task.send::<crate::Result<Brush>>(match Brush::from_ptr(res.cast()) {
                     Some(b) => Ok(b),
                     None => Err(crate::Error::win32_error(Some("CreateSolidBrush"))),
                 });
             }
             Directive::DeleteObject { obj } => {
                 unsafe { wingdi::DeleteObject(obj.as_ptr().as_ptr().cast()) };
-                task.complete::<()>(());
+                task.send::<()>(());
             }
             Directive::CreateWglContext(dc) => {
-                task.complete::<crate::Result<Glrc>>(
+                task.send::<crate::Result<Glrc>>(
                     match Glrc::from_ptr(
                         unsafe { wingdi::wglCreateContext(dc.as_ptr().as_ptr().cast()) }.cast(),
                     ) {
@@ -504,7 +504,7 @@ impl Directive {
                     None => ptr::null_mut(),
                 };
 
-                task.complete::<crate::Result>(
+                task.send::<crate::Result>(
                     if unsafe { wingdi::wglMakeCurrent(dc.cast(), rc.cast()) } == 0 {
                         Err(crate::Error::win32_error(Some("wglMakeCurrent")))
                     } else {
@@ -512,7 +512,7 @@ impl Directive {
                     },
                 );
             }
-            Directive::DestroyWglContext(rc) => task.complete::<crate::Result>(
+            Directive::DestroyWglContext(rc) => task.send::<crate::Result>(
                 if unsafe { wingdi::wglDeleteContext(rc.as_ptr().as_ptr().cast()) } == 0 {
                     Err(crate::Error::win32_error(Some("wglDeleteContext")))
                 } else {
@@ -520,7 +520,7 @@ impl Directive {
                 },
             ),
             Directive::GetWglProcAddress(name) => {
-                task.complete::<Option<GlProc>>(
+                task.send::<Option<GlProc>>(
                     match NonNull::new(unsafe { wingdi::wglGetProcAddress(name.as_ptr()) }) {
                         Some(glproc) => Some(unsafe { GlProc::new(glproc.cast()) }),
                         None => None,
