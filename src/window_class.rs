@@ -3,7 +3,7 @@
 use crate::{
     brush::Brush, cursor::Cursor, directive::Directive, icon::Icon, server::GuiThread, task::Task,
 };
-use std::{borrow::Cow, ffi::CStr, future::Future};
+use std::{borrow::Cow, ffi::CStr, future::Future, marker::PhantomData};
 use winapi::{shared::minwindef::UINT, um::winuser};
 
 bitflags::bitflags! {

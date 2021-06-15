@@ -230,6 +230,32 @@ impl Dc {
     }
 
     #[inline]
+    pub fn arc(
+        self,
+        gt: &GuiThread,
+        rect_left: c_int,
+        rect_top: c_int,
+        rect_right: c_int,
+        rect_bottom: c_int,
+        arc_start_x: c_int,
+        arc_start_y: c_int,
+        arc_end_x: c_int,
+        arc_end_y: c_int,
+    ) -> crate::Result<Task<crate::Result>> {
+        gt.send_directive(Directive::Arc {
+            dc: self,
+            rect_left,
+            rect_top,
+            rect_right,
+            rect_bottom,
+            arc_start_x,
+            arc_start_y,
+            arc_end_x,
+            arc_end_y,
+        })
+    }
+
+    #[inline]
     pub fn ellipse(
         self,
         gt: &GuiThread,

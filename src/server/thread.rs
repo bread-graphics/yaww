@@ -1,6 +1,7 @@
 // MIT/Apache2 License
 
-use crate::{task::ServerTask, window_data::WindowData, wndproc};
+use super::GuiThread;
+use crate::{event::Event, task::ServerTask, window_data::WindowData, wndproc};
 use flume::{Receiver, Sender, TryRecvError};
 use std::{
     cell::{Cell, RefCell},
@@ -42,9 +43,6 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
                 dt_action,
                 task_send: sender,
                 task_recv: recv.clone(),
-                event_handler: RefCell::new(Arc::new(|_, ev| {
-                    log::warn!("Event ignored: {:?}", ev)
-                })),
             };
 
             // start the directive processing thread. this thread pushes new server tasks onto the
@@ -52,6 +50,12 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
             thread::Builder::new()
                 .name(format!("yaww-directive-thread-{}", index))
                 .spawn(move || {
+                    // the current event hanlder is kept here, on the stack
+                    let mut event_handler: Box<dyn FnMut(&GuiThread, Event) + Send + 'static> =
+                        Box::new(|_, ev| {
+                            log::warn!("Event ignored: {:?}", ev);
+                        });
+
                     'dtloop: loop {
                         // first, try to get data from the special signal queue
                         match dt_recv.try_recv() {
@@ -62,6 +66,10 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
                             Err(TryRecvError::Disconnected) => break 'dtloop,
                             // if we're being told to start without stopping, just keep going
                             Ok(DirectiveThreadMessage::Start) => (),
+                            // if we need to set the event handler, set it
+                            Ok(DirectiveThreadMessage::SetEventHandler(evh)) => {
+                                event_handler = evh;
+                            }
                             // if we're begin told to handle an event without stopping, we're in an unreachable
                             // state
                             Ok(DirectiveThreadMessage::ProcessEvent(_)) => unreachable!(),
@@ -73,9 +81,21 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
                                     Err(_) => break 'dtloop,
                                     // if we're being told to stop again, just continue
                                     Ok(DirectiveThreadMessage::Stop) => (),
+                                    // if we need to set the event handler, set it
+                                    Ok(DirectiveThreadMessage::SetEventHandler(evh)) => {
+                                        event_handler = evh;
+                                    }
                                     // while we're parked, we might as well process events
-                                    Ok(DirectiveThreadMessage::ProcessEvent(e)) => {
-                                        wndproc::event_handler_handler(e)
+                                    Ok(DirectiveThreadMessage::ProcessEvent((event, sender))) => {
+                                        // create a copy of the GUI thread from the sender
+                                        let inferior = GuiThread::inferior_copy(sender);
+
+                                        // call the event handler
+                                        (event_handler)(&inferior, event);
+
+                                        // send a dummy task down the pipe to tell the gui thread to resume
+                                        // processing
+                                        inferior.into_inner().send(None).ok();
                                     }
                                     // if we're being told to start, break the stoploop and continue the dtloop
                                     Ok(DirectiveThreadMessage::Start) => break 'stoploop,
@@ -162,5 +182,6 @@ pub(crate) fn create(sender: Sender<Option<ServerTask>>, recv: Receiver<Option<S
 pub(crate) enum DirectiveThreadMessage {
     Stop,
     Start,
-    ProcessEvent(wndproc::TESTuple),
+    ProcessEvent((Event, Sender<Option<ServerTask>>)),
+    SetEventHandler(Box<dyn FnMut(&GuiThread, Event) + Send + 'static>),
 }

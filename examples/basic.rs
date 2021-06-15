@@ -40,6 +40,7 @@ fn main() -> Result {
     let window = gt
         .create_window(
             CLASS_NAME.as_cstr(),
+            None,
             Some(WINDOW_NAME.as_cstr().into()),
             WindowStyle::OVERLAPPED_WINDOW,
             ExtendedWindowStyle::CLIENT_EDGE,
@@ -97,6 +98,8 @@ fn main() -> Result {
             }
             _ => (),
         }
+
+        Ok(())
     })?.wait();
 
     window.invalidate_rect(&gt, None, true)?.wait()?;

@@ -8,7 +8,12 @@ use crate::{
 use flume::{Receiver, Sender};
 use std::{
     cell::{Cell, RefCell},
+    ptr::NonNull,
     sync::Arc,
+};
+use winapi::shared::{
+    minwindef::{LPARAM, LRESULT, UINT, WPARAM},
+    windef::HWND,
 };
 
 // data we pass around the GUI thread
@@ -21,8 +26,12 @@ pub(crate) struct WindowData {
     pub task_recv: Receiver<Option<ServerTask>>,
     // used to send dummy tasks
     pub task_send: Sender<Option<ServerTask>>,
-    // container for the event handler
-    pub event_handler: RefCell<Arc<dyn Fn(&GuiThread, Event) + Send + Sync + 'static>>,
     // the waiting task we notify once the loop is complete
     pub waiter: RefCell<Option<ServerTask>>,
+}
+
+// data we pass around to each window
+pub(crate) struct WindowSpecific {
+    pub subclass: unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT,
+    pub window_data: NonNull<WindowData>,
 }

@@ -14,7 +14,7 @@ use std::{any::Any, future::Future};
 
 pub(crate) use thread::DirectiveThreadMessage;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GuiThread {
     // sends the requests to the server
     task_sender: Sender<Option<ServerTask>>,
@@ -51,7 +51,7 @@ impl GuiThread {
 
     /// Send a directive to the GUI thread and get a task bask to wait on.
     #[inline]
-    pub(crate) fn send_directive<T: Any + Send + Sync + 'static>(
+    pub(crate) fn send_directive<T: Any + Send + 'static>(
         &self,
         directive: Directive,
     ) -> crate::Result<Task<T>> {
@@ -68,7 +68,7 @@ impl GuiThread {
 
     /// Set the event handler.
     #[inline]
-    pub fn set_event_handler<F: Fn(&GuiThread, Event) + Send + Sync + 'static>(
+    pub fn set_event_handler<F: FnMut(&GuiThread, Event) + Send + 'static>(
         &self,
         f: F,
     ) -> crate::Result<Task<()>> {
@@ -81,10 +81,10 @@ impl GuiThread {
     #[inline]
     pub fn set_async_event_handler<
         Fut: Future<Output = ()>,
-        F: Fn(&GuiThread, Event) -> Fut + Send + Sync + 'static,
+        F: FnMut(&GuiThread, Event) -> Fut + Send + 'static,
     >(
         &self,
-        f: F,
+        mut f: F,
     ) -> crate::Result<Task<()>> {
         self.set_event_handler(move |gt, ev| future::block_on(f(gt, ev)))
     }

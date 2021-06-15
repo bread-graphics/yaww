@@ -8,24 +8,29 @@ use crate::{
     glrc::{GlProc, Glrc},
     icon::Icon,
     menu::Menu,
+    monitor::{Monitor, MonitorInfo},
     pen::{Pen, PenStyle},
+    server::DirectiveThreadMessage,
     task::ServerTask,
     window::{ExtendedWindowStyle, Window, WindowStyle},
     window_class::ClassStyle,
-    window_data::WindowData,
+    window_data::{WindowData, WindowSpecific},
     wndproc::yaww_wndproc,
     Rectangle,
 };
 use std::{
     ffi::{CStr, CString},
-    mem,
+    mem::{self, MaybeUninit},
     process::abort,
     ptr::{self, NonNull},
 };
 use winapi::{
     ctypes::c_int,
-    shared::windef::RECT,
-    um::{wingdi, winuser},
+    shared::{
+        minwindef::{BOOL, LPARAM, LRESULT, UINT, WPARAM},
+        windef::{HDC, HMONITOR, HWND, LPRECT, POINT, RECT},
+    },
+    um::{libloaderapi, wingdi, winuser},
 };
 
 impl Directive {
@@ -58,11 +63,12 @@ impl Directive {
         match self {
             Directive::SetEventHandler(event_handler) => {
                 // set the event handler
-                *window_data
-                    .event_handler
-                    .try_borrow_mut()
-                    .expect("Tried to set event handler while processing event") =
-                    event_handler.into_inner().into();
+                window_data
+                    .dt_action
+                    .send(DirectiveThreadMessage::SetEventHandler(
+                        event_handler.into_inner(),
+                    ))
+                    .ok();
                 task.send::<()>(());
             }
             Directive::BeginWait => {
@@ -71,6 +77,82 @@ impl Directive {
             Directive::RunFunction(rf) => {
                 (rf.into_inner())();
                 task.send::<()>(());
+            }
+            Directive::GetMonitors => {
+                // function to iterate over monitors
+                unsafe extern "system" fn monitor_enum_proc(
+                    monitor: HMONITOR,
+                    _hdc: HDC,
+                    rect: LPRECT,
+                    target: LPARAM,
+                ) -> BOOL {
+                    // we could feasible panic here, set up a bomb to abort
+                    struct Bomb;
+
+                    impl Drop for Bomb {
+                        #[cold]
+                        fn drop(&mut self) {
+                            abort();
+                        }
+                    }
+
+                    let _bomb = Bomb;
+
+                    // "target" will always be an "*mut Vec<MonitorInfo>"
+                    let target: *mut Vec<MonitorInfo> =
+                        mem::transmute::<isize, *mut Vec<MonitorInfo>>(target);
+                    let target = &mut *target;
+                    let rect = &*rect;
+
+                    let monitor_info = MonitorInfo {
+                        monitor: match Monitor::from_ptr(monitor.cast()) {
+                            Some(m) => m,
+                            None => {
+                                log::error!("Monitor should never be null!");
+                                mem::forget(_bomb);
+                                return 0;
+                            }
+                        },
+                        x: rect.left,
+                        y: rect.top,
+                        width: rect.right - rect.left,
+                        height: rect.bottom - rect.top,
+                    };
+
+                    target.push(monitor_info);
+
+                    // disarm the bomb
+                    mem::forget(_bomb);
+
+                    1
+                }
+
+                let mut monitor_infos: Vec<MonitorInfo> = vec![];
+                task.send::<crate::Result<Vec<MonitorInfo>>>(
+                    if unsafe {
+                        winuser::EnumDisplayMonitors(
+                            ptr::null_mut(),
+                            ptr::null_mut(),
+                            Some(monitor_enum_proc),
+                            &mut monitor_infos as *mut Vec<MonitorInfo> as isize,
+                        )
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("EnumDisplayMonitors")))
+                    } else {
+                        Ok(monitor_infos)
+                    },
+                );
+            }
+            Directive::GetDefaultMonitor => {
+                const ZERO_POINT: POINT = POINT { x: 0, y: 0 };
+                let monitor = unsafe {
+                    winuser::MonitorFromPoint(ZERO_POINT, winuser::MONITOR_DEFAULTTOPRIMARY)
+                };
+                task.send::<crate::Result<Monitor>>(
+                    Monitor::from_ptr(monitor.cast())
+                        .ok_or_else(|| crate::Error::win32_error(Some("MonitorFromPoint"))),
+                );
             }
             Directive::RegisterClass {
                 style,
@@ -93,6 +175,7 @@ impl Directive {
             }
             Directive::CreateWindow {
                 class_name,
+                base_class,
                 window_name,
                 style,
                 extended_style,
@@ -105,6 +188,7 @@ impl Directive {
             } => task.send::<crate::Result<Window>>(create_window(
                 window_data,
                 &*class_name,
+                base_class.as_deref(),
                 window_name.as_deref(),
                 style,
                 extended_style,
@@ -131,7 +215,7 @@ impl Directive {
             }
             Directive::GetDesktopWindow => {
                 let res = unsafe { winuser::GetDesktopWindow() };
-                // if this fails, something is seriously fucked up
+                // if this fails, something is seriously messed up
                 task.send::<Window>(
                     Window::from_ptr(res.cast()).expect("Desktop window does not exist"),
                 );
@@ -141,7 +225,7 @@ impl Directive {
             }
             Directive::GetParent(window) => {
                 task.send::<Option<Window>>(Window::from_ptr(unsafe {
-                    winuser::GetParent(window.as_ptr().as_ptr().cast()).cast()
+                    winuser::GetAncestor(window.as_ptr().as_ptr().cast(), winuser::GA_PARENT).cast()
                 }));
             }
             Directive::GetWindowText(window) => {
@@ -268,9 +352,10 @@ impl Directive {
             }
             Directive::SetPixel { dc, x, y, color } => {
                 task.send::<crate::Result>(
-                    if unsafe {
+                    if (unsafe {
                         wingdi::SetPixel(dc.as_ptr().as_ptr().cast(), x, y, color.colorref())
-                    } < 0
+                    } as i32)
+                        < 0
                     {
                         Err(crate::Error::win32_error(Some("SetPixel")))
                     } else {
@@ -340,6 +425,38 @@ impl Directive {
                     } == 0
                     {
                         Err(crate::Error::win32_error(Some("RoundRect")))
+                    } else {
+                        Ok(())
+                    },
+                );
+            }
+            Directive::Arc {
+                dc,
+                rect_left,
+                rect_top,
+                rect_right,
+                rect_bottom,
+                arc_start_x,
+                arc_start_y,
+                arc_end_x,
+                arc_end_y,
+            } => {
+                task.send::<crate::Result>(
+                    if unsafe {
+                        wingdi::Arc(
+                            dc.as_ptr().as_ptr().cast(),
+                            rect_left,
+                            rect_top,
+                            rect_right,
+                            rect_bottom,
+                            arc_start_x,
+                            arc_start_y,
+                            arc_end_x,
+                            arc_end_y,
+                        )
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("Arc")))
                     } else {
                         Ok(())
                     },
@@ -585,7 +702,8 @@ fn register_class(
 fn create_window(
     window_data: &WindowData,
     class_name: &CStr,
-    menu_name: Option<&CStr>,
+    base_class: Option<&CStr>,
+    window_name: Option<&CStr>,
     style: WindowStyle,
     extended_style: ExtendedWindowStyle,
     x: c_int,
@@ -609,11 +727,48 @@ fn create_window(
         None => ptr::null_mut(),
     };
 
+    // if we're doing the subclass thing, do it here
+    let default_wndproc: unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT =
+        match base_class {
+            Some(base_class) => {
+                let mut cls: MaybeUninit<winuser::WNDCLASSEXA> = MaybeUninit::uninit();
+                if unsafe {
+                    winuser::GetClassInfoExA(
+                        ptr::null_mut(),
+                        base_class.as_ptr().cast(),
+                        cls.as_mut_ptr(),
+                    )
+                } == 0
+                {
+                    // try again, but with the local module as the scope
+                    if unsafe {
+                        winuser::GetClassInfoExA(
+                            libloaderapi::GetModuleHandleA(ptr::null()),
+                            base_class.as_ptr().cast(),
+                            cls.as_mut_ptr(),
+                        )
+                    } == 0
+                    {
+                        return Err(crate::Error::win32_error(Some("GetClassInfoExA")));
+                    }
+                }
+
+                let cls = unsafe { MaybeUninit::assume_init(cls) };
+                cls.lpfnWndProc.expect("wndproc is an empty pointer?")
+            }
+            None => winuser::DefWindowProcA,
+        };
+
+    let window_specific = Box::new(WindowSpecific {
+        window_data: window_data.into(),
+        subclass: default_wndproc,
+    });
+
     let res = unsafe {
         winuser::CreateWindowExA(
             extended_style.bits(),
             class_name.as_ptr(),
-            match menu_name {
+            match window_name {
                 Some(mn) => mn.as_ptr(),
                 None => ptr::null(),
             },
@@ -625,7 +780,7 @@ fn create_window(
             parent.cast(),
             menu.cast(),
             ptr::null_mut(),
-            window_data as *const WindowData as *const _ as *mut _,
+            Box::into_raw(window_specific) as *mut _,
         )
     };
     match Window::from_ptr(res.cast()) {

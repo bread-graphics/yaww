@@ -12,6 +12,7 @@ pub mod gdiobj;
 pub mod glrc;
 pub mod icon;
 pub mod menu;
+pub mod monitor;
 pub mod pen;
 pub mod task;
 pub mod window;

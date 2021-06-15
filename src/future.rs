@@ -2,7 +2,7 @@
 
 use std::{
     future::Future,
-    mem::ManuallyDrop,
+    mem::{self, ManuallyDrop},
     pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -22,6 +22,7 @@ pub fn block_on(mut future: impl Future<Output = ()>) {
 
     // then, create a waker and a context to go with that waker
     // the waker takes a pointer to the thread to unpark
+    // this is safe because the waker does not outlive the thread
     let th = thread::current();
     let waker = RawWaker::new(&th as *const Thread as *const _, &RAW_WAKER_VTABLE);
     let waker = unsafe { Waker::from_raw(waker) };
@@ -34,6 +35,10 @@ pub fn block_on(mut future: impl Future<Output = ()>) {
             Poll::Pending => thread::park(),
         }
     }
+
+    // ensure that the waker does not outlive the thread
+    mem::drop(ctx);
+    mem::drop(th);
 }
 
 const RAW_WAKER_VTABLE: RawWakerVTable =

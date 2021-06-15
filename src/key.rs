@@ -13,6 +13,7 @@ pub struct Key {
 impl fmt::Debug for Key {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[repr(transparent)]
         struct WriteHex(NonZeroUsize);
 
         impl fmt::Debug for WriteHex {
@@ -30,7 +31,7 @@ impl fmt::Debug for Key {
 
 impl Key {
     #[inline]
-    pub(crate) const unsafe fn from_raw(key: NonZeroUsize) -> Self {
+    pub const fn from_raw(key: NonZeroUsize) -> Self {
         Self { key }
     }
 
@@ -57,5 +58,10 @@ impl Key {
                 key: unsafe { NonZeroUsize::new_unchecked(ptr as usize) },
             })
         }
+    }
+
+    #[inline]
+    pub fn into_raw(self) -> usize {
+        self.key.get()
     }
 }

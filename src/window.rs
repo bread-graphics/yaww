@@ -1,6 +1,9 @@
 // MIT/Apache2 License
 
-use crate::{directive::Directive, menu::Menu, server::GuiThread, task::Task, Key, Rectangle};
+use crate::{
+    directive::Directive, menu::Menu, server::GuiThread, task::Task,
+    Key, Rectangle,
+};
 use std::{
     borrow::Cow,
     ffi::{CStr, CString},
@@ -15,6 +18,7 @@ impl GuiThread {
     pub fn create_window<CN: Into<Cow<'static, CStr>>>(
         &self,
         class_name: CN,
+        base_class: Option<Cow<'static, CStr>>,
         window_name: Option<Cow<'static, CStr>>,
         style: WindowStyle,
         extended_style: ExtendedWindowStyle,
@@ -27,6 +31,7 @@ impl GuiThread {
     ) -> crate::Result<Task<crate::Result<Window>>> {
         self.send_directive(Directive::CreateWindow {
             class_name: class_name.into(),
+            base_class,
             window_name,
             style,
             extended_style,

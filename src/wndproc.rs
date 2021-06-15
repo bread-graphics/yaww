@@ -6,7 +6,7 @@ use crate::{
     server::DirectiveThreadMessage,
     vkey::convert_vkey_to_key as convert_vkey,
     window::Window,
-    window_data::WindowData,
+    window_data::{WindowData, WindowSpecific},
 };
 use std::{
     mem::{self, MaybeUninit},
@@ -21,9 +21,7 @@ use winapi::{
     um::{wingdi, winuser},
 };
 
-mod event;
-pub(crate) use event::{event_handler_handler, TESTuple};
-
+// root to where the win32 api calls for the wndproc
 pub(crate) unsafe extern "system" fn yaww_wndproc(
     hwnd: HWND,
     msg: UINT,
@@ -67,17 +65,21 @@ fn inner_wndproc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESU
 
     // special case for WM_NCCREATE
     if msg == winuser::WM_NCCREATE {
-        // set thw GWLP_USERDATA item
+        // set the GWLP_USERDATA item
         let wdata = lparam as *const winuser::CREATESTRUCTA;
-        let wdata = unsafe { *wdata }.lpCreateParams;
+        let wdata = unsafe { *wdata }.lpCreateParams as *const WindowSpecific;
+
+        // glob the default window proc from this pointer so we can call it later
+        let def_window_proc = unsafe { &*wdata }.subclass;
+
         unsafe { winuser::SetWindowLongPtrA(hwnd.as_ptr(), winuser::GWLP_USERDATA, wdata as _) };
-        return unsafe { winuser::DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam) };
+        return unsafe { def_window_proc(hwnd.as_ptr(), msg, wparam, lparam) };
     }
 
     // then, try to get our window data from the GWLP_USERDATA variable in the window
-    let window_data = match NonNull::new(unsafe {
+    let window_specific = match NonNull::new(unsafe {
         winuser::GetWindowLongPtrA(hwnd.as_ptr(), winuser::GWLP_USERDATA)
-    } as *mut WindowData)
+    } as *mut WindowSpecific)
     {
         Some(window_data) => window_data,
         None => {
@@ -86,10 +88,22 @@ fn inner_wndproc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESU
         }
     };
 
-    match exchange_event(hwnd, msg, wparam, lparam, unsafe { window_data.as_ref() }) {
+    // try to get the default window proc
+    let window_specific_r = unsafe { window_specific.as_ref() };
+    let default_proc = window_specific_r.subclass;
+    let window_data = window_specific_r.window_data;
+
+    let res = match exchange_event(hwnd, msg, wparam, lparam, unsafe { window_data.as_ref() }) {
         Some(res) => res,
-        None => unsafe { winuser::DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam) },
+        None => unsafe { default_proc(hwnd.as_ptr(), msg, wparam, lparam) },
+    };
+
+    if msg == winuser::WM_DESTROY {
+        // deallocate the window-specific memory
+        unsafe { Box::from_raw(window_specific.as_ptr()) };
     }
+
+    res
 }
 
 #[inline]
@@ -263,8 +277,6 @@ fn exchange_event(
 
 #[inline]
 fn handle_event(window_data: &WindowData, event: Event) {
-    let r = window_data.event_handler.borrow();
-
     // tell the directive processing thread to relax, and send a dummy message to ensure it gets the message
     window_data
         .dt_action
@@ -276,7 +288,6 @@ fn handle_event(window_data: &WindowData, event: Event) {
     window_data
         .dt_action
         .send(DirectiveThreadMessage::ProcessEvent((
-            r.clone(),
             event,
             window_data.task_send.clone(),
         )))

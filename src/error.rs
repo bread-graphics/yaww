@@ -1,6 +1,6 @@
 // MIT/Apache2 License
 
-use std::{ffi::CString, fmt, ptr};
+use std::{error, ffi::CString, fmt, ptr};
 use winapi::{
     shared::minwindef::DWORD,
     um::{errhandlingapi, winbase},
@@ -8,6 +8,7 @@ use winapi::{
 
 #[derive(Debug)]
 pub enum Error {
+    Dynamic(Box<dyn error::Error + Send>),
     ServerClosed,
     Win32 {
         code: DWORD,
@@ -21,6 +22,7 @@ impl fmt::Display for Error {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Error::Dynamic(e) => fmt::Display::fmt(e, f),
             Error::ServerClosed => {
                 f.write_str("Attempted to send request to the GUI thread after it closed")
             }

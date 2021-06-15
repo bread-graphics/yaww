@@ -12,6 +12,7 @@ use crate::{
     glrc::Glrc,
     icon::Icon,
     menu::Menu,
+    monitor::Monitor,
     pen::PenStyle,
     server::GuiThread,
     util::DebugContainer,
@@ -25,12 +26,16 @@ use winapi::ctypes::c_int;
 #[derive(Debug)]
 pub(crate) enum Directive {
     // utility functions
-    SetEventHandler(DebugContainer<Box<dyn Fn(&GuiThread, Event) + Send + Sync + 'static>>),
+    SetEventHandler(DebugContainer<Box<dyn FnMut(&GuiThread, Event) + Send + 'static>>),
     BeginWait,
 
     // useful for direct2d, where we might need to run a blocking function in a threadpool... except we already
     // have a threadpool here
-    RunFunction(DebugContainer<Box<dyn FnOnce() + Send + Sync + 'static>>),
+    RunFunction(DebugContainer<Box<dyn FnOnce() + Send + 'static>>),
+
+    // monitor functions
+    GetMonitors,
+    GetDefaultMonitor,
 
     // class functions
     RegisterClass {
@@ -47,6 +52,7 @@ pub(crate) enum Directive {
     CreateWindow {
         class_name: Cow<'static, CStr>,
         window_name: Option<Cow<'static, CStr>>,
+        base_class: Option<Cow<'static, CStr>>,
         style: WindowStyle,
         extended_style: ExtendedWindowStyle,
         x: c_int,
@@ -134,6 +140,17 @@ pub(crate) enum Directive {
         bottom: c_int,
         width: c_int,
         height: c_int,
+    },
+    Arc {
+        dc: Dc,
+        rect_left: c_int,
+        rect_top: c_int,
+        rect_right: c_int,
+        rect_bottom: c_int,
+        arc_start_x: c_int,
+        arc_start_y: c_int,
+        arc_end_x: c_int,
+        arc_end_y: c_int,
     },
     Ellipse {
         dc: Dc,
