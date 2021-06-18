@@ -1,5 +1,7 @@
 // MIT/Apache2 License
 
+use std::{iter, vec::IntoIter as VecIter};
+
 mod process;
 
 use crate::{
@@ -20,19 +22,13 @@ use crate::{
     window_class::ClassStyle,
     Point, Rectangle,
 };
+use breadthread::Directive as BtDirective;
 use std::{borrow::Cow, ffi::CStr};
 use winapi::ctypes::c_int;
 
 #[derive(Debug)]
-pub(crate) enum Directive {
-    // utility functions
-    SetEventHandler(DebugContainer<Box<dyn FnMut(&GuiThread, Event) + Send + 'static>>),
-    BeginWait,
-
-    // useful for direct2d, where we might need to run a blocking function in a threadpool... except we already
-    // have a threadpool here
-    RunFunction(DebugContainer<Box<dyn FnOnce() + Send + 'static>>),
-
+#[doc(hidden)]
+pub enum Directive {
     // monitor functions
     GetMonitors,
     GetDefaultMonitor,
@@ -216,4 +212,74 @@ pub(crate) enum Directive {
     },
     DestroyWglContext(Glrc),
     GetWglProcAddress(Cow<'static, CStr>),
+}
+
+impl BtDirective for Directive {
+    type Pointers = iter::Map<VecIter<Key>, fn(Key) -> NonZeroUsize>;
+
+    #[inline]
+    fn pointers(&self) -> Self::Pointers {
+        match self {
+            Directive::RegisterClass {
+                icon,
+                small_icon,
+                cursor,
+                background,
+                ..
+            } => icon
+                .into_iter()
+                .chain(small_icon)
+                .chain(cursor)
+                .chain(background)
+                .collect::<Vec<_>>(),
+            Directive::CreateWindow { parent, menu, .. } => {
+                parent.into_iter().chain(menu).collect::<Vec<_>>()
+            }
+            Directive::IsChild { parent, child } => vec![parent, child],
+            Directive::SetParent {
+                window,
+                new_parent: Some(new_parent),
+            } => vec![window, new_parent],
+            Directive::SelectObject { dc, obj } => vec![dc, obj],
+            Directive::ReleaseDc { window, dc } => vec![window, dc],
+            Directive::DeleteObject { obj } => vec![obj],
+            Directive::MakeWglCurrent {
+                dc: Some(dc),
+                rc: Some(rc),
+                ..
+            } => vec![dc, rc],
+            Directive::MakeWglCurrent { dc: Some(dc), .. } => vec![dc],
+            Directive::MakeWglCurrent { rc: Some(rc), .. } => vec![rc],
+            Directive::SetParent { window, .. } => vec![window],
+            Directive::SetPixel { dc, .. }
+            | Directive::MoveTo { dc, .. }
+            | Directive::LineTo { dc, .. }
+            | Directive::Rectangle { dc, .. }
+            | Directive::RoundRect { dc, .. }
+            | Directive::Arc { dc, .. }
+            | Directive::Ellipse { dc, .. }
+            | Directive::BezierCurve { dc, .. }
+            | Directive::Polygon { dc, .. }
+            | Directive::Polyline { dc, .. }
+            | Directive::ChoosePixelFormat { dc, .. }
+            | Directive::SetPixelFormat { dc, .. } => vec![dc],
+            Directive::ShowWindow { window, .. }
+            | Directive::InvalidateRect { window, .. }
+            | Directive::MoveWindow { window, .. }
+            | Directive::SetWindowText { window, .. } => vec![window],
+            Directive::CloseWindow(w)
+            | Directive::GetClientRect(w)
+            | Directive::GetParent(w)
+            | Directive::GetWindowRect(w)
+            | Directive::GetWindowText(w)
+            | Directive::IsZoomed(w)
+            | Directive::UpdateWindow(w)
+            | Directive::SwapBuffers(w)
+            | Directive::CreateWglContext(w)
+            | Directive::DestroyWglContext(w) => vec![w],
+            _ => vec![],
+        }
+        .into_iter()
+        .map(|k| k.into())
+    }
 }

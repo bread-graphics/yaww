@@ -1,6 +1,8 @@
 // MIT/Apache2 License
 
-use crate::{color::Color, directive::Directive, gdiobj::GdiObject, server::GuiThread, task::Task};
+use crate::{
+    color::Color, directive::Directive, gdiobj::GdiObject, server::SendsDirective, task::Task,
+};
 use winapi::{ctypes::c_int, um::wingdi};
 
 pub type Pen = GdiObject;
@@ -16,9 +18,18 @@ pub enum PenStyle {
     InsideFrame,
 }
 
-impl GuiThread {
+pub trait PenFunctions {
+    fn create_pen(
+        &self,
+        style: PenStyle,
+        width: c_int,
+        color: Color,
+    ) -> crate::Result<Task<crate::Result<Pen>>>;
+}
+
+impl<S: SendsDirective> PenFunctions for S {
     #[inline]
-    pub fn create_pen(
+    fn create_pen(
         &self,
         style: PenStyle,
         width: c_int,

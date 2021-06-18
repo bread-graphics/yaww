@@ -3,7 +3,7 @@
 use crate::{
     dc::Dc,
     event::{Event, SizeReason},
-    server::DirectiveThreadMessage,
+    server::{DirectiveThreadMessage, PinnedGuiThreadHandle, YawwController},
     vkey::convert_vkey_to_key as convert_vkey,
     window::Window,
     window_data::{WindowData, WindowSpecific},
@@ -21,8 +21,15 @@ use winapi::{
     um::{wingdi, winuser},
 };
 
+/// Combine insertion of the subclass and the window handle.
+pub(crate) struct HandleAndSubclass<'evh> {
+    pub(crate) handle: PinnedGuiThreadHandle<'evh>,
+    pub(crate) subclass: Option<unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT>,
+}
+
 // root to where the win32 api calls for the wndproc
-pub(crate) unsafe extern "system" fn yaww_wndproc(
+// 'evh is a parameter for PinnedGuiThreadHandle
+pub(crate) unsafe extern "system" fn yaww_wndproc<'evh>(
     hwnd: HWND,
     msg: UINT,
     wparam: WPARAM,
@@ -41,7 +48,7 @@ pub(crate) unsafe extern "system" fn yaww_wndproc(
 
     let _bomb = Bomb;
 
-    let res = inner_wndproc(hwnd, msg, wparam, lparam);
+    let res = inner_wndproc::<'evh>(hwnd, msg, wparam, lparam);
 
     // disarm the bomb
     mem::forget(_bomb);
@@ -50,7 +57,7 @@ pub(crate) unsafe extern "system" fn yaww_wndproc(
 }
 
 #[inline]
-fn inner_wndproc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+fn inner_wndproc<'evh>(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     // first, check if the handle is null
     // if it's null, there's not much we can do, so we defer to the default
     let hwnd = match NonNull::new(hwnd) {
@@ -67,52 +74,70 @@ fn inner_wndproc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESU
     if msg == winuser::WM_NCCREATE {
         // set the GWLP_USERDATA item
         let wdata = lparam as *const winuser::CREATESTRUCTA;
-        let wdata = unsafe { *wdata }.lpCreateParams as *const WindowSpecific;
+        let wdata = unsafe { *wdata }.lpCreateParams as *mut HandleAndSubclass<'evh>;
+        let wdata = unsafe { Box::from_raw(wdata) };
 
         // glob the default window proc from this pointer so we can call it later
-        let def_window_proc = unsafe { &*wdata }.subclass;
+        let HandleAndSubClass { handle, subclass } = *wdata;
+        if let Some(subclass) = subclass {
+            let _ = handle.with(move |controller| {
+                controller.insert_subclass(
+                    unsafe { NonZeroUsize::new_unchecked(hwnd.as_ptr() as usize) },
+                    subclass,
+                )
+            });
+        }
+        let def_window_proc = subclass.unwrap_or(DefWindowProcA);
 
-        unsafe { winuser::SetWindowLongPtrA(hwnd.as_ptr(), winuser::GWLP_USERDATA, wdata as _) };
+        unsafe {
+            winuser::SetWindowLongPtrA(
+                hwnd.as_ptr(),
+                winuser::GWLP_USERDATA,
+                handle.into_raw() as _,
+            )
+        };
         return unsafe { def_window_proc(hwnd.as_ptr(), msg, wparam, lparam) };
     }
 
-    // then, try to get our window data from the GWLP_USERDATA variable in the window
-    let window_specific = match NonNull::new(unsafe {
-        winuser::GetWindowLongPtrA(hwnd.as_ptr(), winuser::GWLP_USERDATA)
-    } as *mut WindowSpecific)
-    {
-        Some(window_data) => window_data,
-        None => {
-            // defer to the default
-            return unsafe { winuser::DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam) };
-        }
-    };
+    // then, try to get our handle from the GWLP_USERDATA variable in the window
+    let handle =
+        unsafe { winuser::GetWindowLongPtrA(hwnd.as_ptr(), winuser::GWLP_USERDATA) } as *const ();
+
+    if handle.is_null() {
+        // defer to the default
+        return unsafe { winuser::DefWindowProcA(hwnd.as_ptr(), msg, wparam, lparam) };
+    }
 
     // try to get the default window proc
-    let window_specific_r = unsafe { window_specific.as_ref() };
-    let default_proc = window_specific_r.subclass;
-    let window_data = window_specific_r.window_data;
+    let handle = unsafe { PinnedGuiThreadHandle::<'evh>::from_raw(wdata) };
+    let default_proc = handle
+        .with(|controller| {
+            controller
+                .subclass(unsafe { NonZeroUsize::new_unchecked(hwnd.as_ptr() as usize) })
+                .unwrap_or(DefWindowProcA)
+        })
+        .unwrap();
 
-    let res = match exchange_event(hwnd, msg, wparam, lparam, unsafe { window_data.as_ref() }) {
+    let res = match exchange_event(hwnd, msg, wparam, lparam, &handle) {
         Some(res) => res,
         None => unsafe { default_proc(hwnd.as_ptr(), msg, wparam, lparam) },
     };
 
-    if msg == winuser::WM_DESTROY {
-        // deallocate the window-specific memory
-        unsafe { Box::from_raw(window_specific.as_ptr()) };
+    if msg != winuser::WM_DESTROY {
+        // avoid decrementing count
+        mem::forget(handle);
     }
 
     res
 }
 
 #[inline]
-fn exchange_event(
+fn exchange_event<'evh>(
     hwnd: NonNull<HWND__>,
     msg: UINT,
     wparam: WPARAM,
     lparam: LPARAM,
-    window_data: &WindowData,
+    window_data: &PinnedGuiThreadHandle<'evh>,
 ) -> Option<LRESULT> {
     let window = Window::from_ptr_nn(hwnd.cast());
 
@@ -124,11 +149,12 @@ fn exchange_event(
         }
         winuser::WM_DESTROY => {
             // decrement the window counter by one
-            let window_count = window_data.window_count.get().saturating_sub(1);
-            window_data.window_count.set(window_count);
+            let window_count = window_data
+                .with(|window_data| window_data.decrement_window_count())
+                .unwrap();
 
-            // if the window count is zero and we're in a wait cycle, send the quit message to the thread
-            if window_count == 0 && window_data.waiter.borrow().is_some() {
+            // if the window count is zero, send the quit message to the thread
+            if window_count == 0 {
                 handle_event(window_data, Event::Quit);
                 unsafe { winuser::PostQuitMessage(0) };
             }
@@ -276,42 +302,9 @@ fn exchange_event(
 }
 
 #[inline]
-fn handle_event(window_data: &WindowData, event: Event) {
-    // tell the directive processing thread to relax, and send a dummy message to ensure it gets the message
-    window_data
-        .dt_action
-        .send(DirectiveThreadMessage::Stop)
-        .ok();
-    window_data.task_send.send(None).ok();
-
-    // offload the event handler onto the directive processing thread
-    window_data
-        .dt_action
-        .send(DirectiveThreadMessage::ProcessEvent((
-            event,
-            window_data.task_send.clone(),
-        )))
-        .ok();
-
-    // begin processing events in this thread until the event handler finishes
-    loop {
-        log::trace!("Beginning process task");
-        match window_data.task_recv.recv() {
-            // Ok(None) indicates it's time to stop
-            Ok(None) | Err(_) => {
-                log::trace!("Ending process task miniloop");
-                break;
-            }
-            Ok(Some(mut tsk)) => {
-                let directive = tsk.input().unwrap();
-                directive.process(&window_data, tsk);
-            }
-        }
-        log::trace!("Ending process task");
+fn handle_event(window_data: &PinnedGuiThreadHandle<'evh>, event: Event) {
+    // note: this should always be on the gui thread
+    if window_data.process_event(event).is_err() {
+        log::error!("Failed to process event: not in bread thread");
     }
-
-    window_data
-        .dt_action
-        .send(DirectiveThreadMessage::Start)
-        .ok();
 }

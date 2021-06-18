@@ -25,7 +25,6 @@ pub(crate) mod key;
 pub(crate) mod server;
 pub(crate) mod util;
 pub(crate) mod vkey;
-pub(crate) mod window_data;
 pub(crate) mod wndproc;
 
 //#[cfg(feature = "direct2d")]
@@ -58,4 +57,11 @@ pub struct Rectangle {
 pub struct Point {
     pub x: LONG,
     pub y: LONG,
+}
+
+pub mod prelude {
+    pub use super::{
+        brush::BrushFunctions, glrc::WglFunctions, monitor::MonitorFunctions, pen::PenFunctions,
+        window_class::WcFunctions,
+    };
 }

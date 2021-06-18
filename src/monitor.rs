@@ -1,6 +1,6 @@
 // MIT/Apache2 License
 
-use crate::{directive::Directive, key::Key, server::GuiThread, task::Task};
+use crate::{directive::Directive, key::Key, server::SendsDirective, task::Task};
 use winapi::shared::ntdef::LONG;
 
 pub type Monitor = Key;
@@ -14,16 +14,21 @@ pub struct MonitorInfo {
     pub height: LONG,
 }
 
-impl GuiThread {
+pub trait MonitorFunctions {
     /// Get a list of every monitor currently available.
+    fn monitors(&self) -> crate::Result<Task<crate::Result<Vec<MonitorInfo>>>>;
+    /// Get the default monitor.
+    fn default_monitor(&self) -> crate::Result<Task<crate::Result<Monitor>>>;
+}
+
+impl<S: SendsDirective> MonitorFunctions for S {
     #[inline]
-    pub fn monitors(&self) -> crate::Result<Task<crate::Result<Vec<MonitorInfo>>>> {
+    fn monitors(&self) -> crate::Result<Task<crate::Result<Vec<MonitorInfo>>>> {
         self.send_directive(Directive::GetMonitors)
     }
 
-    /// Get the default monitor.
     #[inline]
-    pub fn default_monitor(&self) -> crate::Result<Task<crate::Result<Monitor>>> {
+    fn default_monitor(&self) -> crate::Result<Task<crate::Result<Monitor>>> {
         self.send_directive(Directive::GetDefaultMonitor)
     }
 }

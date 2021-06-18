@@ -31,7 +31,7 @@ impl fmt::Debug for Key {
 
 impl Key {
     #[inline]
-    pub const fn from_raw(key: NonZeroUsize) -> Self {
+    pub const unsafe fn from_raw(key: NonZeroUsize) -> Self {
         Self { key }
     }
 
@@ -61,7 +61,14 @@ impl Key {
     }
 
     #[inline]
-    pub fn into_raw(self) -> usize {
-        self.key.get()
+    pub fn into_raw(self) -> NonZeroUsize {
+        self.key
+    }
+}
+
+impl From<Key> for NonZeroUsize {
+    #[inline]
+    fn from(k: Key) -> NonZeroUsize {
+        k.key
     }
 }

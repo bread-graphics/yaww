@@ -1,7 +1,8 @@
 // MIT/Apache2 License
 
 use crate::{
-    brush::Brush, cursor::Cursor, directive::Directive, icon::Icon, server::GuiThread, task::Task,
+    brush::Brush, cursor::Cursor, directive::Directive, icon::Icon, server::SendsDirective,
+    task::Task,
 };
 use std::{borrow::Cow, ffi::CStr, future::Future, marker::PhantomData};
 use winapi::{shared::minwindef::UINT, um::winuser};
@@ -24,10 +25,23 @@ bitflags::bitflags! {
     }
 }
 
-impl GuiThread {
+pub trait WcFunctions {
     /// Register a class.
+    fn register_class<CN: Into<Cow<'static, CStr>>>(
+        &self,
+        class_name: CN,
+        menu_name: Option<Cow<'static, CStr>>,
+        style: ClassStyle,
+        icon: Option<Icon>,
+        small_icon: Option<Icon>,
+        cursor: Option<Cursor>,
+        background: Option<Brush>,
+    ) -> crate::Result<Task<crate::Result>>;
+}
+
+impl<S: SendsDirective> WcFunctions for S {
     #[inline]
-    pub fn register_class<CN: Into<Cow<'static, CStr>>>(
+    fn register_class<CN: Into<Cow<'static, CStr>>>(
         &self,
         class_name: CN,
         menu_name: Option<Cow<'static, CStr>>,

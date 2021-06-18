@@ -1,21 +1,36 @@
 // MIT/Apache2 License
 
-use std::{error, ffi::CString, fmt, ptr};
+use std::{error, ffi::CString, fmt, num::NonZeroUsize, ptr, sync::Arc};
 use winapi::{
     shared::minwindef::DWORD,
     um::{errhandlingapi, winbase},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Error {
-    Dynamic(Box<dyn error::Error + Send>),
+    Dynamic(Arc<dyn error::Error + Send>),
     ServerClosed,
+    InvalidPtrs(Vec<NonZeroUsize>),
     Win32 {
         code: DWORD,
         message: CString,
         function: Option<&'static str>,
     },
     FailedToGetError,
+}
+
+impl From<breadthread::Error<Error>> for Error {
+    #[inline]
+    fn from(bt: breadthread::Error<Error>) -> Error {
+        match bt {
+            breadthread::Error::InvalidPtrs(ptrs) => Error::InvalidPtrs(ptrs),
+            breadthread::Error::Closed => Error::ServerClosed,
+            breadthread::Error::UnableToComplete => {
+                panic!("yaww should never forget to close its directives")
+            }
+            breadthread::Error::Controller(e) => e,
+        }
+    }
 }
 
 impl fmt::Display for Error {

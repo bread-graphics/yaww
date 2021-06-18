@@ -2,7 +2,7 @@
 
 use crate::{
     color::Color, directive::Directive, gdiobj::GdiObject, server::GuiThread, task::Task, Key,
-    Point,
+    Point, SendsDireective,
 };
 use std::{borrow::Cow, mem};
 use winapi::{
@@ -150,23 +150,23 @@ impl From<PixelType> for BYTE {
 
 impl Dc {
     #[inline]
-    pub fn select_object(
+    pub fn select_object<S: SendsDirective>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         obj: GdiObject,
     ) -> crate::Result<Task<crate::Result<GdiObject>>> {
         gt.send_directive(Directive::SelectObject { dc: self, obj })
     }
 
     #[inline]
-    pub fn swap_buffers(self, gt: &GuiThread) -> crate::Result<Task<crate::Result>> {
+    pub fn swap_buffers<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<crate::Result>> {
         gt.send_directive(Directive::SwapBuffers(self))
     }
 
     #[inline]
-    pub fn set_pixel(
+    pub fn set_pixel<S: SendsDirective>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         x: c_int,
         y: c_int,
         color: Color,
@@ -180,19 +180,29 @@ impl Dc {
     }
 
     #[inline]
-    pub fn move_to(self, gt: &GuiThread, x: c_int, y: c_int) -> crate::Result<Task<crate::Result>> {
+    pub fn move_to<S: SendsDirective>(
+        self,
+        gt: &S,
+        x: c_int,
+        y: c_int,
+    ) -> crate::Result<Task<crate::Result>> {
         gt.send_directive(Directive::MoveTo { dc: self, x, y })
     }
 
     #[inline]
-    pub fn line_to(self, gt: &GuiThread, x: c_int, y: c_int) -> crate::Result<Task<crate::Result>> {
+    pub fn line_to<S: SendsDirective>(
+        self,
+        gt: &S,
+        x: c_int,
+        y: c_int,
+    ) -> crate::Result<Task<crate::Result>> {
         gt.send_directive(Directive::LineTo { dc: self, x, y })
     }
 
     #[inline]
-    pub fn rectangle(
+    pub fn rectangle<S: SendsDirective>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         left: c_int,
         top: c_int,
         right: c_int,
@@ -208,9 +218,9 @@ impl Dc {
     }
 
     #[inline]
-    pub fn round_rect(
+    pub fn round_rect<S: SendsDirective>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         left: c_int,
         top: c_int,
         right: c_int,
@@ -230,9 +240,9 @@ impl Dc {
     }
 
     #[inline]
-    pub fn arc(
+    pub fn arc<S: SendsDirective>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         rect_left: c_int,
         rect_top: c_int,
         rect_right: c_int,
@@ -256,9 +266,9 @@ impl Dc {
     }
 
     #[inline]
-    pub fn ellipse(
+    pub fn ellipse<S: SendsDirective>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         left: c_int,
         top: c_int,
         right: c_int,
@@ -274,9 +284,9 @@ impl Dc {
     }
 
     #[inline]
-    pub fn chord(
+    pub fn chord<S: SendsDirective>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         rect_left: c_int,
         rect_top: c_int,
         rect_right: c_int,
@@ -300,9 +310,9 @@ impl Dc {
     }
 
     #[inline]
-    pub fn bezier_curve<Pts: Into<Cow<'static, [Point]>>>(
+    pub fn bezier_curve<S: SendsDirective, Pts: Into<Cow<'static, [Point]>>>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         points: Pts,
     ) -> crate::Result<Task<crate::Result>> {
         gt.send_directive(Directive::BezierCurve {
@@ -312,9 +322,9 @@ impl Dc {
     }
 
     #[inline]
-    pub fn polygon<Pts: Into<Cow<'static, [Point]>>>(
+    pub fn polygon<S: SendsDirective, Pts: Into<Cow<'static, [Point]>>>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         points: Pts,
     ) -> crate::Result<Task<crate::Result>> {
         gt.send_directive(Directive::Polygon {
@@ -324,9 +334,9 @@ impl Dc {
     }
 
     #[inline]
-    pub fn polyline<Pts: Into<Cow<'static, [Point]>>>(
+    pub fn polyline<S: SendsDirective, Pts: Into<Cow<'static, [Point]>>>(
         self,
-        gt: &GuiThread,
+        gt: &S,
         points: Pts,
     ) -> crate::Result<Task<crate::Result>> {
         gt.send_directive(Directive::Polyline {

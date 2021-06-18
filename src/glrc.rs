@@ -1,6 +1,6 @@
 // MIT/Apache2 License
 
-use crate::{dc::Dc, directive::Directive, server::GuiThread, task::Task, Key};
+use crate::{dc::Dc, directive::Directive, server::SendsDirective, task::Task, Key};
 use std::ptr::NonNull;
 use winapi::ctypes::c_void;
 
@@ -30,14 +30,25 @@ impl GlProc {
 
 impl Dc {
     #[inline]
-    pub fn create_wgl_context(self, gt: &GuiThread) -> crate::Result<Task<crate::Result<Glrc>>> {
+    pub fn create_wgl_context<S: SendsDirective>(
+        self,
+        gt: &S,
+    ) -> crate::Result<Task<crate::Result<Glrc>>> {
         gt.send_directive(Directive::CreateWglContext(self))
     }
 }
 
-impl GuiThread {
+pub trait WglFunctions {
+    fn make_wgl_current(
+        &self,
+        dc: Option<Dc>,
+        rc: Option<Glrc>,
+    ) -> crate::Result<Task<crate::Result>>;
+}
+
+impl<S: SendsDirective> WglFunctions for S {
     #[inline]
-    pub fn make_wgl_current(
+    fn make_wgl_current(
         &self,
         dc: Option<Dc>,
         rc: Option<Glrc>,

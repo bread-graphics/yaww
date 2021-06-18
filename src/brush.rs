@@ -1,6 +1,10 @@
 // MIT/Apache2 License
 
-use crate::{color::Color, directive::Directive, gdiobj::GdiObject, server::GuiThread, task::Task};
+use crate::{
+    color::Color, directive::Directive, gdiobj::GdiObject, server::GuiThread,
+    server::SendsDirective, task::Task,
+};
+use orphan_crippler::Receiver;
 use std::num::NonZeroUsize;
 use winapi::um::winuser;
 
@@ -12,9 +16,13 @@ pub const DEFAULT_BRUSH: Brush = unsafe {
     ))
 };
 
-impl GuiThread {
+pub trait BrushFunctions {
+    fn create_solid_brush(&self, color: Color) -> crate::Result<Receiver<crate::Result<Brush>>>;
+}
+
+impl<S: SendsDirective> BrushFuncions for S {
     #[inline]
-    pub fn create_solid_brush(&self, color: Color) -> crate::Result<Task<crate::Result<Brush>>> {
+    fn create_solid_brush(&self, color: Color) -> crate::Result<Receiver<crate::Result<Brush>>> {
         self.send_directive(Directive::CreateSolidBrush(color))
     }
 }
