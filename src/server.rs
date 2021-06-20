@@ -1,20 +1,28 @@
 // MIT/Apache2 License
 
 use crate::{directive::Directive, event::Event};
-use breadthread::{BreadThread, Completer, Controller, PinnedThreadHandle, ThreadHandle};
-use orphan_crippler::Receiver;
+use breadthread::{
+    AddOrRemovePtr, BreadThread, Completer, Controller, DirectiveAdaptor, LoopCycle,
+    PinnedThreadHandle, ThreadHandle,
+};
+use orphan_crippler::{Receiver, Sender};
 use std::{
-    cell::RefCell,
+    any::Any,
+    cell::{Cell, RefCell},
     collections::{HashMap, VecDeque},
     iter,
     mem::{self, MaybeUninit},
+    num::NonZeroUsize,
     rc::Rc,
 };
 use winapi::{
-    shared::minwindef::{DWORD, LPARAM, UINT},
+    shared::{
+        minwindef::{DWORD, LPARAM, LRESULT, UINT, WPARAM},
+        windef::HWND,
+    },
     um::{
         processthreadsapi::GetCurrentThreadId,
-        winuser::{GetMessage, PostThreadMessageA, TranslateMessage, MSG, WM_APP},
+        winuser::{DispatchMessage, GetMessage, PostThreadMessageA, TranslateMessage, MSG, WM_APP},
     },
 };
 
@@ -28,7 +36,7 @@ impl<'evh> GuiThread<'evh> {
     /// Create a new `GuiThread` on this thread.
     #[inline]
     pub fn new() -> Self {
-        let mut bt = BreadThread::new(YawwControler {
+        let mut bt = BreadThread::new(YawwController {
             handle: None,
             window_count: Cell::new(-1),
             subclasses: RefCell::new(HashMap::new()),
@@ -37,7 +45,7 @@ impl<'evh> GuiThread<'evh> {
         bt.with_mut(|ctrl| {
             ctrl.handle = Some(PinnedGuiThreadHandle { inner: th });
         });
-        bt
+        GuiThread { inner: bt }
     }
 
     /// Get a handle to this `GuiThread` that can be sent between threads.
@@ -104,11 +112,16 @@ impl<'evh> PinnedGuiThreadHandle<'evh> {
         directive: Directive,
     ) -> crate::Result<Receiver<T>> {
         let r = self.inner.send_directive(directive)?;
-        r
+        Ok(r)
     }
 
     #[inline]
-    pub(crate) fn set_event_handler<F: FnMut(&YawwController<'evh>, Event) + Send>(&self, f: F) {
+    pub(crate) fn set_event_handler<
+        F: FnMut(&YawwController<'evh>, Event) -> Result<(), crate::Error> + Send + 'evh,
+    >(
+        &self,
+        f: F,
+    ) {
         self.inner.set_event_handler(f);
     }
 
@@ -119,18 +132,15 @@ impl<'evh> PinnedGuiThreadHandle<'evh> {
         }
     }
 
-    /// Convert into a pointer.
     #[inline]
-    pub(crate) fn into_raw(self) -> *const () {
-        self.inner.into_raw()
+    pub(crate) fn with<T, F: FnOnce(&YawwController<'evh>) -> T>(&self, f: F) -> T {
+        self.inner.with(f).unwrap()
     }
 
-    /// Retrieve from a pointer, UB if not from into_raw()
     #[inline]
-    pub(crate) unsafe fn from_raw(ptr: *const ()) -> Self {
-        Self {
-            inner: PinnedThreadHandle::from_raw(ptr),
-        }
+    pub(crate) fn process_event(&self, event: Event) -> crate::Result<()> {
+        self.inner.process_event(event)?;
+        Ok(())
     }
 }
 
@@ -165,7 +175,7 @@ impl<'evh> SendsDirective for PinnedGuiThreadHandle<'evh> {
 const WM_DIRECTIVE: UINT = WM_APP + 0x1337;
 
 /// The inner controller type. Should not be exposed to the public.
-pub(crate) struct YawwControler<'evh> {
+pub(crate) struct YawwController<'evh> {
     /// An inner handle to the bread thread to send directives with.    
     handle: Option<PinnedGuiThreadHandle<'evh>>,
     /// The current number of windows. -1 represents windows not being uninit.
@@ -227,7 +237,7 @@ impl<'evh> Controller for YawwController<'evh> {
     type Pointers = iter::Once<AddOrRemovePtr>;
 
     #[inline]
-    fn directive_adaptor(&mut self) -> DirectiveAdaptor {
+    fn directive_adaptor(&mut self) -> YawwDirectiveAdaptor {
         // SAFETY: all this does is get the thread ID
         YawwDirectiveAdaptor {
             thread_id: unsafe { GetCurrentThreadId() },
@@ -242,7 +252,7 @@ impl<'evh> Controller for YawwController<'evh> {
             match unsafe { GetMessage(msg.as_mut_ptr(), ptr::null_mut(), 0, 0) } {
                 -1 => {
                     // get message had an error
-                    return Err(crate::win32_error(Some("GetMessage")));
+                    return Err(crate::Error::win32_error(Some("GetMessage")));
                 }
                 0 => {
                     // we got the quit message; return a break
@@ -252,10 +262,10 @@ impl<'evh> Controller for YawwController<'evh> {
                     // SAFETY: if GetMessage returned non-0 and non-(-1), msg is init
                     let msg = MaybeUninit::assume_init(msg);
 
-                    if msg == WM_DIRECTIVE {
+                    if msg.message == WM_DIRECTIVE {
                         // SAFETY: this is our user-defined event, where lparam is a Box<Sender<Directive>>
                         let sender: Box<Sender<Directive>> =
-                            unsafe { Box::from_raw(sender.lparam as *mut _) };
+                            unsafe { Box::from_raw(msg.lParam as *mut _) };
                         return Ok(LoopCycle::Directive(*sender));
                     } else {
                         // SAFETY: it is well-defined to do these things with an msg pointer
@@ -295,7 +305,7 @@ impl DirectiveAdaptor<Directive> for YawwDirectiveAdaptor {
         // send it!
         unsafe {
             // SAFETY: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postthreadmessagea
-            PostThreadMessageA(self.thread_id, WM_DIRECTIVE, 0, directive)
+            PostThreadMessageA(self.thread_id, WM_DIRECTIVE, 0, directive);
         }
     }
 }

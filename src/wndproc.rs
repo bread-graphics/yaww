@@ -3,13 +3,13 @@
 use crate::{
     dc::Dc,
     event::{Event, SizeReason},
-    server::{DirectiveThreadMessage, PinnedGuiThreadHandle, YawwController},
+    server::{PinnedGuiThreadHandle, YawwController},
     vkey::convert_vkey_to_key as convert_vkey,
     window::Window,
-    window_data::{WindowData, WindowSpecific},
 };
 use std::{
     mem::{self, MaybeUninit},
+    num::NonZeroUsize,
     process,
     ptr::{self, NonNull},
 };
@@ -23,13 +23,13 @@ use winapi::{
 
 /// Combine insertion of the subclass and the window handle.
 pub(crate) struct HandleAndSubclass<'evh> {
-    pub(crate) handle: PinnedGuiThreadHandle<'evh>,
+    pub(crate) handle: Box<PinnedGuiThreadHandle<'evh>>,
     pub(crate) subclass: Option<unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT>,
 }
 
 // root to where the win32 api calls for the wndproc
 // 'evh is a parameter for PinnedGuiThreadHandle
-pub(crate) unsafe extern "system" fn yaww_wndproc<'evh>(
+pub(crate) unsafe extern "system" fn yaww_wndproc(
     hwnd: HWND,
     msg: UINT,
     wparam: WPARAM,
@@ -48,7 +48,7 @@ pub(crate) unsafe extern "system" fn yaww_wndproc<'evh>(
 
     let _bomb = Bomb;
 
-    let res = inner_wndproc::<'evh>(hwnd, msg, wparam, lparam);
+    let res = inner_wndproc(hwnd, msg, wparam, lparam);
 
     // disarm the bomb
     mem::forget(_bomb);
@@ -78,7 +78,7 @@ fn inner_wndproc<'evh>(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) ->
         let wdata = unsafe { Box::from_raw(wdata) };
 
         // glob the default window proc from this pointer so we can call it later
-        let HandleAndSubClass { handle, subclass } = *wdata;
+        let HandleAndSubclass { handle, subclass } = *wdata;
         if let Some(subclass) = subclass {
             let _ = handle.with(move |controller| {
                 controller.insert_subclass(
@@ -87,21 +87,21 @@ fn inner_wndproc<'evh>(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) ->
                 )
             });
         }
-        let def_window_proc = subclass.unwrap_or(DefWindowProcA);
+        let def_window_proc = subclass.unwrap_or(winuser::DefWindowProcA);
 
         unsafe {
             winuser::SetWindowLongPtrA(
                 hwnd.as_ptr(),
                 winuser::GWLP_USERDATA,
-                handle.into_raw() as _,
+                Box::into_raw(handle) as _,
             )
         };
         return unsafe { def_window_proc(hwnd.as_ptr(), msg, wparam, lparam) };
     }
 
     // then, try to get our handle from the GWLP_USERDATA variable in the window
-    let handle =
-        unsafe { winuser::GetWindowLongPtrA(hwnd.as_ptr(), winuser::GWLP_USERDATA) } as *const ();
+    let handle = unsafe { winuser::GetWindowLongPtrA(hwnd.as_ptr(), winuser::GWLP_USERDATA) }
+        as *mut PinnedGuiThreadHandle<'evh>;
 
     if handle.is_null() {
         // defer to the default
@@ -109,14 +109,12 @@ fn inner_wndproc<'evh>(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) ->
     }
 
     // try to get the default window proc
-    let handle = unsafe { PinnedGuiThreadHandle::<'evh>::from_raw(wdata) };
-    let default_proc = handle
-        .with(|controller| {
-            controller
-                .subclass(unsafe { NonZeroUsize::new_unchecked(hwnd.as_ptr() as usize) })
-                .unwrap_or(DefWindowProcA)
-        })
-        .unwrap();
+    let handle = unsafe { Box::from_raw(handle) };
+    let default_proc = handle.with(|controller| {
+        controller
+            .subclass(unsafe { NonZeroUsize::new_unchecked(hwnd.as_ptr() as usize) })
+            .unwrap_or(winuser::DefWindowProcA)
+    });
 
     let res = match exchange_event(hwnd, msg, wparam, lparam, &handle) {
         Some(res) => res,
@@ -124,7 +122,7 @@ fn inner_wndproc<'evh>(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) ->
     };
 
     if msg != winuser::WM_DESTROY {
-        // avoid decrementing count
+        // avoid dropping handle
         mem::forget(handle);
     }
 
@@ -149,9 +147,7 @@ fn exchange_event<'evh>(
         }
         winuser::WM_DESTROY => {
             // decrement the window counter by one
-            let window_count = window_data
-                .with(|window_data| window_data.decrement_window_count())
-                .unwrap();
+            let window_count = window_data.with(|window_data| window_data.decrement_window_count());
 
             // if the window count is zero, send the quit message to the thread
             if window_count == 0 {
@@ -302,7 +298,7 @@ fn exchange_event<'evh>(
 }
 
 #[inline]
-fn handle_event(window_data: &PinnedGuiThreadHandle<'evh>, event: Event) {
+fn handle_event<'evh>(window_data: &PinnedGuiThreadHandle<'evh>, event: Event) {
     // note: this should always be on the gui thread
     if window_data.process_event(event).is_err() {
         log::error!("Failed to process event: not in bread thread");

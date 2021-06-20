@@ -141,6 +141,7 @@ impl Directive {
                     Monitor::from_ptr(monitor.cast())
                         .ok_or_else(|| crate::Error::win32_error(Some("MonitorFromPoint"))),
                 );
+                return AddOrRemovePtr::AddPtr(monitor);
             }
             Directive::RegisterClass {
                 style,
@@ -173,20 +174,31 @@ impl Directive {
                 height,
                 parent,
                 menu,
-            } => completer.complete::<crate::Result<Window>>(create_window(
-                window_data,
-                &*class_name,
-                base_class.as_deref(),
-                window_name.as_deref(),
-                style,
-                extended_style,
-                x,
-                y,
-                width,
-                height,
-                parent,
-                menu,
-            )),
+            } => {
+                let res = create_window(
+                    controller,
+                    &*class_name,
+                    base_class.as_deref(),
+                    window_name.as_deref(),
+                    style,
+                    extended_style,
+                    x,
+                    y,
+                    width,
+                    height,
+                    parent,
+                    menu,
+                );
+
+                let aorp = match &res {
+                    Ok(win) => Some(*win),
+                    Err(_) => None,
+                };
+
+                completer.complete::<crate::Result<Window>>(res);
+
+                aorp
+            }
             Directive::ShowWindow { window, command } => {
                 unsafe { winuser::ShowWindow(window.as_ptr().as_ptr().cast(), command.bits()) };
                 completer.complete::<()>(());
@@ -209,7 +221,7 @@ impl Directive {
                 );
             }
             Directive::GetWindowRect(window) => {
-                complete_with_rectangle!(task, window, GetWindowRect);
+                complete_with_rectangle!(completer, window, GetWindowRect);
             }
             Directive::GetParent(window) => {
                 completer.complete::<Option<Window>>(Window::from_ptr(unsafe {
@@ -636,6 +648,8 @@ impl Directive {
             }
             directive => unreachable!("Got illegal directive: {:?}", directive),
         }
+
+        AddOrRemovePtr::DoNothing
     }
 }
 
@@ -748,7 +762,10 @@ fn create_window<'evh>(
     };
 
     let handle = window_data.handle().clone();
-    let has = HandleAndSubclass { handle, subclass };
+    let has = HandleAndSubclass {
+        handle: Box::new(handle),
+        subclass,
+    };
     let has = Box::new(has);
 
     let res = unsafe {

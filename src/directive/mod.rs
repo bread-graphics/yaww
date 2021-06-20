@@ -13,6 +13,7 @@ use crate::{
     gdiobj::GdiObject,
     glrc::Glrc,
     icon::Icon,
+    key::Key,
     menu::Menu,
     monitor::Monitor,
     pen::PenStyle,
@@ -23,7 +24,7 @@ use crate::{
     Point, Rectangle,
 };
 use breadthread::Directive as BtDirective;
-use std::{borrow::Cow, ffi::CStr};
+use std::{borrow::Cow, ffi::CStr, num::NonZeroUsize};
 use winapi::ctypes::c_int;
 
 #[derive(Debug)]
@@ -220,21 +221,7 @@ impl BtDirective for Directive {
     #[inline]
     fn pointers(&self) -> Self::Pointers {
         match self {
-            Directive::RegisterClass {
-                icon,
-                small_icon,
-                cursor,
-                background,
-                ..
-            } => icon
-                .into_iter()
-                .chain(small_icon)
-                .chain(cursor)
-                .chain(background)
-                .collect::<Vec<_>>(),
-            Directive::CreateWindow { parent, menu, .. } => {
-                parent.into_iter().chain(menu).collect::<Vec<_>>()
-            }
+            Directive::CreateWindow { parent, .. } => parent.into_iter().collect::<Vec<_>>(),
             Directive::IsChild { parent, child } => vec![parent, child],
             Directive::SetParent {
                 window,

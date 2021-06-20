@@ -20,7 +20,7 @@ pub trait BrushFunctions {
     fn create_solid_brush(&self, color: Color) -> crate::Result<Receiver<crate::Result<Brush>>>;
 }
 
-impl<S: SendsDirective> BrushFuncions for S {
+impl<S: SendsDirective> BrushFunctions for S {
     #[inline]
     fn create_solid_brush(&self, color: Color) -> crate::Result<Receiver<crate::Result<Brush>>> {
         self.send_directive(Directive::CreateSolidBrush(color))

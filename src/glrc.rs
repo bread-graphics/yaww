@@ -59,7 +59,7 @@ impl<S: SendsDirective> WglFunctions for S {
 
 impl Glrc {
     #[inline]
-    pub fn delete_wgl(self, gt: &GuiThread) -> crate::Result<Task<crate::Result>> {
+    pub fn delete_wgl<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<crate::Result>> {
         gt.send_directive(Directive::DestroyWglContext(self))
     }
 }

@@ -1,7 +1,7 @@
 // MIT/Apache2 License
 
 use crate::{
-    color::Color, directive::Directive, gdiobj::GdiObject, server::GuiThread, task::Task, Key,
+    color::Color, directive::Directive, gdiobj::GdiObject, server::SendsDirective, task::Task, Key,
     Point, SendsDireective,
 };
 use std::{borrow::Cow, mem};
