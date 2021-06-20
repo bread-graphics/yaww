@@ -51,7 +51,7 @@ impl<S: SendsDirective> WcFunctions for S {
         cursor: Option<Cursor>,
         background: Option<Brush>,
     ) -> crate::Result<Task<crate::Result>> {
-        self.send_directive(Directive::RegisterClass {
+        self.send(Directive::RegisterClass {
             class_name: class_name.into(),
             menu_name,
             style,

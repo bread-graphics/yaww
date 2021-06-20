@@ -35,7 +35,7 @@ impl<S: SendsDirective> PenFunctions for S {
         width: c_int,
         color: Color,
     ) -> crate::Result<Task<crate::Result<Pen>>> {
-        self.send_directive(Directive::CreatePen {
+        self.send(Directive::CreatePen {
             style,
             width,
             color,

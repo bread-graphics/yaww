@@ -46,7 +46,7 @@ impl<S: SendsDirective> WindowFunctions for S {
         parent: Option<Window>,
         menu: Option<Menu>,
     ) -> crate::Result<Task<crate::Result<Window>>> {
-        self.send_directive(Directive::CreateWindow {
+        self.send(Directive::CreateWindow {
             class_name: class_name.into(),
             base_class,
             window_name,
@@ -63,7 +63,7 @@ impl<S: SendsDirective> WindowFunctions for S {
 
     #[inline]
     fn get_desktop_window(&self) -> crate::Result<Task<Window>> {
-        self.send_directive(Directive::GetDesktopWindow)
+        self.send(Directive::GetDesktopWindow)
     }
 }
 
@@ -74,7 +74,7 @@ impl Window {
         gt: &S,
         command: ShowWindowCommand,
     ) -> crate::Result<Task<()>> {
-        gt.send_directive(Directive::ShowWindow {
+        gt.send(Directive::ShowWindow {
             window: self,
             command,
         })
@@ -90,7 +90,7 @@ impl Window {
         height: c_int,
         repaint: bool,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::MoveWindow {
+        gt.send(Directive::MoveWindow {
             window: self,
             x,
             y,
@@ -102,7 +102,7 @@ impl Window {
 
     #[inline]
     pub fn close<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::CloseWindow(self))
+        gt.send(Directive::CloseWindow(self))
     }
 
     #[inline]
@@ -110,7 +110,7 @@ impl Window {
         self,
         gt: &S,
     ) -> crate::Result<Task<crate::Result<Rectangle>>> {
-        gt.send_directive(Directive::GetClientRect(self))
+        gt.send(Directive::GetClientRect(self))
     }
 
     #[inline]
@@ -118,12 +118,12 @@ impl Window {
         self,
         gt: &S,
     ) -> crate::Result<Task<crate::Result<Rectangle>>> {
-        gt.send_directive(Directive::GetWindowRect(self))
+        gt.send(Directive::GetWindowRect(self))
     }
 
     #[inline]
     pub fn get_parent<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<Option<Window>>> {
-        gt.send_directive(Directive::GetParent(self))
+        gt.send(Directive::GetParent(self))
     }
 
     /// Get the text for a window.
@@ -132,7 +132,7 @@ impl Window {
         self,
         gt: &S,
     ) -> crate::Result<Task<Option<CString>>> {
-        gt.send_directive(Directive::GetWindowText(self))
+        gt.send(Directive::GetWindowText(self))
     }
 
     #[inline]
@@ -141,7 +141,7 @@ impl Window {
         gt: &S,
         parent: Window,
     ) -> crate::Result<Task<bool>> {
-        gt.send_directive(Directive::IsChild {
+        gt.send(Directive::IsChild {
             parent,
             child: self,
         })
@@ -149,7 +149,7 @@ impl Window {
 
     #[inline]
     pub fn is_zoomed<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<bool>> {
-        gt.send_directive(Directive::IsZoomed(self))
+        gt.send(Directive::IsZoomed(self))
     }
 
     #[inline]
@@ -158,7 +158,7 @@ impl Window {
         gt: &S,
         parent: Option<Window>,
     ) -> crate::Result<Task<crate::Result<Window>>> {
-        gt.send_directive(Directive::SetParent {
+        gt.send(Directive::SetParent {
             window: self,
             new_parent: parent,
         })
@@ -170,12 +170,12 @@ impl Window {
         gt: &S,
         text: Cow<'static, CStr>,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::SetWindowText { window: self, text })
+        gt.send(Directive::SetWindowText { window: self, text })
     }
 
     #[inline]
     pub fn update_window<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::UpdateWindow(self))
+        gt.send(Directive::UpdateWindow(self))
     }
 
     #[inline]
@@ -185,7 +185,7 @@ impl Window {
         rect: Option<Rectangle>,
         erase: bool,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::InvalidateRect {
+        gt.send(Directive::InvalidateRect {
             window: self,
             rect,
             erase,

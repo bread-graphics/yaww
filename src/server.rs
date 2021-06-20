@@ -13,6 +13,7 @@ use std::{
     iter,
     mem::{self, MaybeUninit},
     num::NonZeroUsize,
+    ptr,
     rc::Rc,
 };
 use winapi::{
@@ -22,7 +23,9 @@ use winapi::{
     },
     um::{
         processthreadsapi::GetCurrentThreadId,
-        winuser::{DispatchMessage, GetMessage, PostThreadMessageA, TranslateMessage, MSG, WM_APP},
+        winuser::{
+            DispatchMessageA, GetMessageA, PostThreadMessageA, TranslateMessage, MSG, WM_APP,
+        },
     },
 };
 
@@ -122,7 +125,7 @@ impl<'evh> PinnedGuiThreadHandle<'evh> {
         &self,
         f: F,
     ) {
-        self.inner.set_event_handler(f);
+        self.inner.set_event_handler(f).unwrap();
     }
 
     #[inline]
@@ -249,10 +252,10 @@ impl<'evh> Controller for YawwController<'evh> {
         let mut msg = MaybeUninit::<MSG>::uninit();
         loop {
             // SAFETY: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmessage
-            match unsafe { GetMessage(msg.as_mut_ptr(), ptr::null_mut(), 0, 0) } {
+            match unsafe { GetMessageA(msg.as_mut_ptr(), ptr::null_mut(), 0, 0) } {
                 -1 => {
                     // get message had an error
-                    return Err(crate::Error::win32_error(Some("GetMessage")));
+                    return Err(crate::Error::win32_error(Some("GetMessageA")));
                 }
                 0 => {
                     // we got the quit message; return a break
@@ -260,7 +263,7 @@ impl<'evh> Controller for YawwController<'evh> {
                 }
                 _ => {
                     // SAFETY: if GetMessage returned non-0 and non-(-1), msg is init
-                    let msg = MaybeUninit::assume_init(msg);
+                    let msg = unsafe { MaybeUninit::assume_init(msg) };
 
                     if msg.message == WM_DIRECTIVE {
                         // SAFETY: this is our user-defined event, where lparam is a Box<Sender<Directive>>
@@ -271,7 +274,7 @@ impl<'evh> Controller for YawwController<'evh> {
                         // SAFETY: it is well-defined to do these things with an msg pointer
                         unsafe {
                             TranslateMessage(&msg);
-                            DispatchMessage(&msg);
+                            DispatchMessageA(&msg);
                         }
                     }
                 }
@@ -290,7 +293,7 @@ impl<'evh> Controller for YawwController<'evh> {
 }
 
 #[repr(transparent)]
-struct YawwDirectiveAdaptor {
+pub(crate) struct YawwDirectiveAdaptor {
     thread_id: DWORD,
 }
 

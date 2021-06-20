@@ -34,7 +34,7 @@ impl Dc {
         self,
         gt: &S,
     ) -> crate::Result<Task<crate::Result<Glrc>>> {
-        gt.send_directive(Directive::CreateWglContext(self))
+        gt.send(Directive::CreateWglContext(self))
     }
 }
 
@@ -53,13 +53,13 @@ impl<S: SendsDirective> WglFunctions for S {
         dc: Option<Dc>,
         rc: Option<Glrc>,
     ) -> crate::Result<Task<crate::Result>> {
-        self.send_directive(Directive::MakeWglCurrent { dc, rc })
+        self.send(Directive::MakeWglCurrent { dc, rc })
     }
 }
 
 impl Glrc {
     #[inline]
     pub fn delete_wgl<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::DestroyWglContext(self))
+        gt.send(Directive::DestroyWglContext(self))
     }
 }

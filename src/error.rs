@@ -8,7 +8,7 @@ use winapi::{
 
 #[derive(Debug, Clone)]
 pub enum Error {
-    Dynamic(Arc<dyn error::Error + Send>),
+    Dynamic(Arc<dyn error::Error + Send + Sync>),
     ServerClosed,
     InvalidPtrs(Vec<NonZeroUsize>),
     Win32 {
@@ -17,6 +17,7 @@ pub enum Error {
         function: Option<&'static str>,
     },
     FailedToGetError,
+    AlreadyAYawwThread,
 }
 
 impl From<breadthread::Error<Error>> for Error {
@@ -28,6 +29,10 @@ impl From<breadthread::Error<Error>> for Error {
             breadthread::Error::UnableToComplete => {
                 panic!("yaww should never forget to close its directives")
             }
+            breadthread::Error::NotInBreadThread => {
+                panic!("yaww should never forget about the bread thread")
+            }
+            breadthread::Error::AlreadyABreadThread => Error::AlreadyAYawwThread,
             breadthread::Error::Controller(e) => e,
         }
     }
@@ -38,6 +43,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Dynamic(e) => fmt::Display::fmt(e, f),
+            Error::InvalidPtrs(p) => write!(f, "Invalid pointers: {:?}", p),
             Error::ServerClosed => {
                 f.write_str("Attempted to send request to the GUI thread after it closed")
             }
@@ -56,6 +62,7 @@ impl fmt::Display for Error {
                 code, function, message
             ),
             Error::FailedToGetError => f.write_str("Failed to get the error message"),
+            Error::AlreadyAYawwThread => f.write_str("Thread is already a Yaww thread"),
         }
     }
 }

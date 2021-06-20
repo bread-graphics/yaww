@@ -2,7 +2,7 @@
 
 use crate::{
     color::Color, directive::Directive, gdiobj::GdiObject, server::SendsDirective, task::Task, Key,
-    Point, SendsDireective,
+    Point,
 };
 use std::{borrow::Cow, mem};
 use winapi::{
@@ -155,12 +155,12 @@ impl Dc {
         gt: &S,
         obj: GdiObject,
     ) -> crate::Result<Task<crate::Result<GdiObject>>> {
-        gt.send_directive(Directive::SelectObject { dc: self, obj })
+        gt.send(Directive::SelectObject { dc: self, obj })
     }
 
     #[inline]
     pub fn swap_buffers<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::SwapBuffers(self))
+        gt.send(Directive::SwapBuffers(self))
     }
 
     #[inline]
@@ -171,7 +171,7 @@ impl Dc {
         y: c_int,
         color: Color,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::SetPixel {
+        gt.send(Directive::SetPixel {
             dc: self,
             x,
             y,
@@ -186,7 +186,7 @@ impl Dc {
         x: c_int,
         y: c_int,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::MoveTo { dc: self, x, y })
+        gt.send(Directive::MoveTo { dc: self, x, y })
     }
 
     #[inline]
@@ -196,7 +196,7 @@ impl Dc {
         x: c_int,
         y: c_int,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::LineTo { dc: self, x, y })
+        gt.send(Directive::LineTo { dc: self, x, y })
     }
 
     #[inline]
@@ -208,7 +208,7 @@ impl Dc {
         right: c_int,
         bottom: c_int,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::Rectangle {
+        gt.send(Directive::Rectangle {
             dc: self,
             left,
             top,
@@ -228,7 +228,7 @@ impl Dc {
         width: c_int,
         height: c_int,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::RoundRect {
+        gt.send(Directive::RoundRect {
             dc: self,
             left,
             top,
@@ -252,7 +252,7 @@ impl Dc {
         arc_end_x: c_int,
         arc_end_y: c_int,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::Arc {
+        gt.send(Directive::Arc {
             dc: self,
             rect_left,
             rect_top,
@@ -274,7 +274,7 @@ impl Dc {
         right: c_int,
         bottom: c_int,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::Ellipse {
+        gt.send(Directive::Ellipse {
             dc: self,
             left,
             top,
@@ -296,7 +296,7 @@ impl Dc {
         line_x2: c_int,
         line_y2: c_int,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::Chord {
+        gt.send(Directive::Chord {
             dc: self,
             rect_left,
             rect_top,
@@ -315,7 +315,7 @@ impl Dc {
         gt: &S,
         points: Pts,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::BezierCurve {
+        gt.send(Directive::BezierCurve {
             dc: self,
             points: points.into(),
         })
@@ -327,7 +327,7 @@ impl Dc {
         gt: &S,
         points: Pts,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::Polygon {
+        gt.send(Directive::Polygon {
             dc: self,
             points: points.into(),
         })
@@ -339,7 +339,7 @@ impl Dc {
         gt: &S,
         points: Pts,
     ) -> crate::Result<Task<crate::Result>> {
-        gt.send_directive(Directive::Polyline {
+        gt.send(Directive::Polyline {
             dc: self,
             points: points.into(),
         })

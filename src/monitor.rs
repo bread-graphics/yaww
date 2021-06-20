@@ -24,11 +24,11 @@ pub trait MonitorFunctions {
 impl<S: SendsDirective> MonitorFunctions for S {
     #[inline]
     fn monitors(&self) -> crate::Result<Task<crate::Result<Vec<MonitorInfo>>>> {
-        self.send_directive(Directive::GetMonitors)
+        self.send(Directive::GetMonitors)
     }
 
     #[inline]
     fn default_monitor(&self) -> crate::Result<Task<crate::Result<Monitor>>> {
-        self.send_directive(Directive::GetDefaultMonitor)
+        self.send(Directive::GetDefaultMonitor)
     }
 }

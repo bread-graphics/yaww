@@ -221,24 +221,26 @@ impl BtDirective for Directive {
     #[inline]
     fn pointers(&self) -> Self::Pointers {
         match self {
-            Directive::CreateWindow { parent, .. } => parent.into_iter().collect::<Vec<_>>(),
-            Directive::IsChild { parent, child } => vec![parent, child],
+            Directive::CreateWindow { parent, .. } => {
+                parent.into_iter().copied().collect::<Vec<Key>>()
+            }
+            Directive::IsChild { parent, child } => vec![*parent, *child],
             Directive::SetParent {
                 window,
                 new_parent: Some(new_parent),
-            } => vec![window, new_parent],
-            Directive::SelectObject { dc, obj } => vec![dc, obj],
-            Directive::ReleaseDc { window, dc } => vec![window, dc],
-            Directive::DeleteObject { obj } => vec![obj],
+            } => vec![*window, *new_parent],
+            Directive::SelectObject { dc, obj } => vec![*dc, *obj],
+            Directive::ReleaseDc { window, dc } => vec![*window, *dc],
+            Directive::DeleteObject { obj } => vec![*obj],
             Directive::MakeWglCurrent {
                 dc: Some(dc),
                 rc: Some(rc),
                 ..
-            } => vec![dc, rc],
-            Directive::MakeWglCurrent { dc: Some(dc), .. } => vec![dc],
-            Directive::MakeWglCurrent { rc: Some(rc), .. } => vec![rc],
-            Directive::SetParent { window, .. } => vec![window],
-            Directive::SetPixel { dc, .. }
+            } => vec![*dc, *rc],
+            Directive::MakeWglCurrent { dc: Some(dc), .. } => vec![*dc],
+            Directive::MakeWglCurrent { rc: Some(rc), .. } => vec![*rc],
+            Directive::SetParent { window, .. } => vec![*window],
+            /*            Directive::SetPixel { dc, .. }
             | Directive::MoveTo { dc, .. }
             | Directive::LineTo { dc, .. }
             | Directive::Rectangle { dc, .. }
@@ -249,11 +251,11 @@ impl BtDirective for Directive {
             | Directive::Polygon { dc, .. }
             | Directive::Polyline { dc, .. }
             | Directive::ChoosePixelFormat { dc, .. }
-            | Directive::SetPixelFormat { dc, .. } => vec![dc],
+            | Directive::SetPixelFormat { dc, .. } => vec![dc],*/
             Directive::ShowWindow { window, .. }
             | Directive::InvalidateRect { window, .. }
             | Directive::MoveWindow { window, .. }
-            | Directive::SetWindowText { window, .. } => vec![window],
+            | Directive::SetWindowText { window, .. } => vec![*window],
             Directive::CloseWindow(w)
             | Directive::GetClientRect(w)
             | Directive::GetParent(w)
@@ -263,7 +265,7 @@ impl BtDirective for Directive {
             | Directive::UpdateWindow(w)
             | Directive::SwapBuffers(w)
             | Directive::CreateWglContext(w)
-            | Directive::DestroyWglContext(w) => vec![w],
+            | Directive::DestroyWglContext(w) => vec![*w],
             _ => vec![],
         }
         .into_iter()
