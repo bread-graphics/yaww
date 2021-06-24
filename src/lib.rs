@@ -36,7 +36,7 @@ pub use color::*;
 pub use error::*;
 pub use event::*;
 pub use key::*;
-pub use server::GuiThread;
+pub use server::{GuiThread, GuiThreadHandle, PinnedGuiThreadHandle, SendsDirective};
 pub use task::Task;
 pub use window::*;
 pub use window_class::*;
