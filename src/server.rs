@@ -51,6 +51,32 @@ impl<'evh> GuiThread<'evh> {
         GuiThread { inner: bt }
     }
 
+    #[inline]
+    pub fn try_new() -> crate::Result<Self> {
+        let mut bt = BreadThread::try_new(YawwController {
+            handle: None,
+            window_count: Cell::new(-1),
+            subclasses: RefCell::new(HashMap::new()),
+        })?;
+        let th = bt.handle().pin();
+        bt.with_mut(|ctrl| {
+            ctrl.handle = Some(PinnedGuiThreadHandle { inner: th });
+        });
+        Ok(GuiThread { inner: bt })
+    }
+
+    /// Change the event handler.
+    #[inline]
+    pub fn set_event_handler<
+        F: FnMut(&PinnedGuiThreadHandle<'evh>, Event) -> Result<(), crate::Error> + Send + 'evh,
+    >(
+        &self,
+        mut f: F,
+    ) {
+        self.inner
+            .set_event_handler(move |ctrl, event| f(ctrl.handle(), event));
+    }
+
     /// Get a handle to this `GuiThread` that can be sent between threads.
     #[inline]
     pub fn handle(&self) -> GuiThreadHandle<'evh> {
@@ -240,7 +266,7 @@ impl<'evh> Controller for YawwController<'evh> {
     type Pointers = iter::Once<AddOrRemovePtr>;
 
     #[inline]
-    fn directive_adaptor(&mut self) -> YawwDirectiveAdaptor {
+    fn directive_adaptor(&self) -> YawwDirectiveAdaptor {
         // SAFETY: all this does is get the thread ID
         YawwDirectiveAdaptor {
             thread_id: unsafe { GetCurrentThreadId() },
@@ -248,7 +274,7 @@ impl<'evh> Controller for YawwController<'evh> {
     }
 
     #[inline]
-    fn loop_cycle(&mut self) -> Result<LoopCycle<Event, Directive>, crate::Error> {
+    fn loop_cycle(&self) -> Result<LoopCycle<Event, Directive>, crate::Error> {
         let mut msg = MaybeUninit::<MSG>::uninit();
         loop {
             // SAFETY: https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmessage

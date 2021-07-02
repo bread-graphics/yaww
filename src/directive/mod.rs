@@ -85,6 +85,8 @@ pub enum Directive {
         y: c_int,
         width: c_int,
         height: c_int,
+        dont_move: bool,
+        dont_resize: bool,
         repaint: bool,
     },
     SetParent {

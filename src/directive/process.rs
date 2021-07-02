@@ -292,16 +292,31 @@ impl Directive {
                 y,
                 width,
                 height,
+                dont_move,
+                dont_resize,
                 repaint,
             } => completer.complete::<crate::Result>(
                 if unsafe {
-                    winuser::MoveWindow(
+                    winuser::SetWindowPos(
                         window.as_ptr().as_ptr().cast(),
+                        ptr::null_mut(),
                         x,
                         y,
                         width,
                         height,
-                        if repaint { 1 } else { 0 },
+                        {
+                            let mut flags = winuser::SWP_NOZORDER;
+                            if dont_move {
+                                flags |= winuser::SWP_NOMOVE;
+                            }
+                            if dont_resize {
+                                flags |= winuser::SWP_NOSIZE;
+                            }
+                            if !repaint {
+                                flags |= winuser::SWP_NOREDRAW;
+                            }
+                            flags
+                        },
                     )
                 } == 0
                 {

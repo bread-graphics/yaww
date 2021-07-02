@@ -19,7 +19,7 @@ bitflags::bitflags! {
         const H_REDRAW = winuser::CS_HREDRAW;
         const NO_CLOSE = winuser::CS_NOCLOSE;
         const OWN_DC = winuser::CS_OWNDC;
-        const PARRENT_DC = winuser::CS_PARENTDC;
+        const PARENT_DC = winuser::CS_PARENTDC;
         const SAVE_BITS = winuser::CS_SAVEBITS;
         const V_REDRAW = winuser::CS_VREDRAW;
     }

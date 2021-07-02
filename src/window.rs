@@ -81,7 +81,7 @@ impl Window {
     }
 
     #[inline]
-    pub fn move_window<S: SendsDirective>(
+    pub fn move_resize_window<S: SendsDirective>(
         self,
         gt: &S,
         x: c_int,
@@ -96,6 +96,48 @@ impl Window {
             y,
             width,
             height,
+            dont_move: false,
+            dont_resize: false,
+            repaint,
+        })
+    }
+
+    #[inline]
+    pub fn move_window<S: SendsDirective>(
+        self,
+        gt: &S,
+        x: c_int,
+        y: c_int,
+        repaint: bool,
+    ) -> crate::Result<Task<crate::Result>> {
+        gt.send(Directive::MoveWindow {
+            window: self,
+            x,
+            y,
+            width: 0,
+            height: 0,
+            dont_move: false,
+            dont_resize: true,
+            repaint,
+        })
+    }
+
+    #[inline]
+    pub fn resize_window<S: SendsDirective>(
+        self,
+        gt: &S,
+        width: c_int,
+        height: c_int,
+        repaint: bool,
+    ) -> crate::Result<Task<crate::Result>> {
+        gt.send(Directive::MoveWindow {
+            window: self,
+            x: 0,
+            y: 0,
+            width,
+            height,
+            dont_move: true,
+            dont_resize: false,
             repaint,
         })
     }

@@ -31,7 +31,7 @@ impl fmt::Debug for Key {
 
 impl Key {
     #[inline]
-    pub const unsafe fn from_raw(key: NonZeroUsize) -> Self {
+    pub const fn from_raw(key: NonZeroUsize) -> Self {
         Self { key }
     }
 
