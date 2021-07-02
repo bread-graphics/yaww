@@ -110,11 +110,12 @@ fn inner_wndproc<'evh>(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) ->
 
     // try to get the default window proc
     let handle = unsafe { Box::from_raw(handle) };
+
     let default_proc = handle.with(|controller| {
         controller
             .subclass(unsafe { NonZeroUsize::new_unchecked(hwnd.as_ptr() as usize) })
             .unwrap_or(winuser::DefWindowProcA)
-    });
+    }).unwrap_or(winuser::DefWindowProcA);
 
     let res = match exchange_event(hwnd, msg, wparam, lparam, &handle) {
         Some(res) => res,
@@ -150,7 +151,7 @@ fn exchange_event<'evh>(
             let window_count = window_data.with(|window_data| window_data.decrement_window_count());
 
             // if the window count is zero, send the quit message to the thread
-            if window_count == 0 {
+            if matches!(window_count, None | Some(0)) {
                 handle_event(window_data, Event::Quit);
                 unsafe { winuser::PostQuitMessage(0) };
             }

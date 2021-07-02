@@ -5,6 +5,7 @@ use breadthread::{
     AddOrRemovePtr, BreadThread, Completer, Controller, DirectiveAdaptor, LoopCycle,
     PinnedThreadHandle, ThreadHandle,
 };
+use once_cell::unsync::OnceCell;
 use orphan_crippler::{Receiver, Sender};
 use std::{
     any::Any,
@@ -40,13 +41,13 @@ impl<'evh> GuiThread<'evh> {
     #[inline]
     pub fn new() -> Self {
         let mut bt = BreadThread::new(YawwController {
-            handle: None,
+            handle: OnceCell::new(),
             window_count: Cell::new(-1),
             subclasses: RefCell::new(HashMap::new()),
         });
         let th = bt.handle().pin();
-        bt.with_mut(|ctrl| {
-            ctrl.handle = Some(PinnedGuiThreadHandle { inner: th });
+        bt.with(move |ctrl| {
+            let _ = ctrl.handle.set(PinnedGuiThreadHandle { inner: th });
         });
         GuiThread { inner: bt }
     }
@@ -54,13 +55,13 @@ impl<'evh> GuiThread<'evh> {
     #[inline]
     pub fn try_new() -> crate::Result<Self> {
         let mut bt = BreadThread::try_new(YawwController {
-            handle: None,
+            handle: OnceCell::new(),
             window_count: Cell::new(-1),
             subclasses: RefCell::new(HashMap::new()),
         })?;
         let th = bt.handle().pin();
-        bt.with_mut(|ctrl| {
-            ctrl.handle = Some(PinnedGuiThreadHandle { inner: th });
+        bt.with(move |ctrl| {
+            let _ = ctrl.handle.set(PinnedGuiThreadHandle { inner: th });
         });
         Ok(GuiThread { inner: bt })
     }
@@ -162,8 +163,8 @@ impl<'evh> PinnedGuiThreadHandle<'evh> {
     }
 
     #[inline]
-    pub(crate) fn with<T, F: FnOnce(&YawwController<'evh>) -> T>(&self, f: F) -> T {
-        self.inner.with(f).unwrap()
+    pub(crate) fn with<T, F: FnOnce(&YawwController<'evh>) -> T>(&self, f: F) -> Option<T> {
+        self.inner.with(f).ok()
     }
 
     #[inline]
@@ -206,7 +207,7 @@ const WM_DIRECTIVE: UINT = WM_APP + 0x1337;
 /// The inner controller type. Should not be exposed to the public.
 pub(crate) struct YawwController<'evh> {
     /// An inner handle to the bread thread to send directives with.    
-    handle: Option<PinnedGuiThreadHandle<'evh>>,
+    handle: OnceCell<PinnedGuiThreadHandle<'evh>>,
     /// The current number of windows. -1 represents windows not being uninit.
     window_count: Cell<isize>,
     /// Hash map of window IDs to window subclasses.
@@ -219,7 +220,7 @@ impl<'evh> YawwController<'evh> {
     #[inline]
     pub(crate) fn handle(&self) -> &PinnedGuiThreadHandle<'evh> {
         self.handle
-            .as_ref()
+            .get()
             .expect("handle should never be None during normal operation")
     }
 
