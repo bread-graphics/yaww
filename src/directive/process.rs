@@ -2,9 +2,11 @@
 
 use super::Directive;
 use crate::{
+    bitmap::Bitmap,
     brush::Brush,
     cursor::Cursor,
-    gdiobj::GdiObject,
+    dc::{BitBltOp, Dc},
+    gdiobj::{GdiObject, StockObject},
     glrc::{GlProc, Glrc},
     icon::Icon,
     menu::Menu,
@@ -382,6 +384,22 @@ impl Directive {
                 };
                 completer.complete::<()>(());
             }
+            Directive::CreateCompatibleDc(dc) => {
+                let res = unsafe { wingdi::CreateCompatibleDC(dc.as_ptr().as_ptr().cast()) };
+                let obj = Window::from_ptr(res.cast());
+                completer.complete::<crate::Result<Dc>>(match obj {
+                    Some(o) => Ok(o),
+                    None => Err(crate::Error::win32_error(Some("CreateCompatibleDc"))),
+                });
+                if let Some(obj) = obj {
+                    return AddOrRemovePtr::AddPtr(obj.into_raw());
+                }
+            }
+            Directive::DeleteDc(dc) => {
+                unsafe { wingdi::DeleteDC(dc.as_ptr().as_ptr().cast()) };
+                completer.complete::<()>(());
+                return AddOrRemovePtr::RemovePtr(dc.into_raw());
+            }
             Directive::SetPixel { dc, x, y, color } => {
                 completer.complete::<crate::Result>(
                     if (unsafe {
@@ -638,10 +656,111 @@ impl Directive {
                     return AddOrRemovePtr::AddPtr(brush.into_raw());
                 }
             }
+            Directive::GetStockObject(so) => {
+                let ty = match so {
+                    StockObject::NullBrush => wingdi::NULL_BRUSH as c_int,
+                };
+                let res = unsafe { wingdi::GetStockObject(ty) };
+                let obj = GdiObject::from_ptr(res.cast());
+
+                completer.complete::<Option<GdiObject>>(obj);
+
+                if let Some(obj) = obj {
+                    return AddOrRemovePtr::AddPtr(obj.into_raw());
+                }
+            }
             Directive::DeleteObject { obj } => {
                 unsafe { wingdi::DeleteObject(obj.as_ptr().as_ptr().cast()) };
                 completer.complete::<()>(());
                 return AddOrRemovePtr::RemovePtr(obj.into_raw());
+            }
+            Directive::CreateCompatibleBitmap { dc, width, height } => {
+                let bitmap = unsafe {
+                    wingdi::CreateCompatibleBitmap(dc.as_ptr().as_ptr().cast(), width, height)
+                };
+                match GdiObject::from_ptr(bitmap.cast()) {
+                    Some(obj) => {
+                        completer.complete::<crate::Result<Bitmap>>(Ok(obj));
+                        return AddOrRemovePtr::AddPtr(obj.into_raw());
+                    }
+                    None => {
+                        completer.complete::<crate::Result<Bitmap>>(Err(
+                            crate::Error::win32_error(Some("CreateCompatibleBitmap")),
+                        ));
+                    }
+                }
+            }
+            Directive::SetPixels {
+                dc,
+                origin_x,
+                origin_y,
+                width,
+                pixels,
+            } => {
+                pixels
+                    .into_iter()
+                    .fold((origin_x, origin_y), move |(x, y), pixel| {
+                        unsafe { wingdi::SetPixelV(dc.as_ptr().as_ptr().cast(), x, y, pixel) };
+
+                        match x + 1 {
+                            x if x >= width => (0, y + 1),
+                            x => (x, y),
+                        }
+                    });
+
+                completer.complete::<()>(());
+            }
+            Directive::BitBlt {
+                src,
+                dst,
+                src_x,
+                src_y,
+                dst_x,
+                dst_y,
+                width,
+                height,
+                op,
+            } => {
+                let op = match op {
+                    BitBltOp::Blackness => wingdi::BLACKNESS,
+                    BitBltOp::CaptureBlt => wingdi::CAPTUREBLT,
+                    BitBltOp::DstInvert => wingdi::DSTINVERT,
+                    BitBltOp::MergeCopy => wingdi::MERGECOPY,
+                    BitBltOp::MergePaint => wingdi::MERGEPAINT,
+                    BitBltOp::NoMirrorBitmap => wingdi::NOMIRRORBITMAP,
+                    BitBltOp::NotSrcCopy => wingdi::NOTSRCCOPY,
+                    BitBltOp::NotSrcErase => wingdi::NOTSRCERASE,
+                    BitBltOp::PatCopy => wingdi::PATCOPY,
+                    BitBltOp::PatInvert => wingdi::PATINVERT,
+                    BitBltOp::PatPaint => wingdi::PATPAINT,
+                    BitBltOp::SrcAnd => wingdi::SRCAND,
+                    BitBltOp::SrcCopy => wingdi::SRCCOPY,
+                    BitBltOp::SrcErase => wingdi::SRCERASE,
+                    BitBltOp::SrcInvert => wingdi::SRCINVERT,
+                    BitBltOp::SrcPaint => wingdi::SRCPAINT,
+                    BitBltOp::Whiteness => wingdi::WHITENESS,
+                };
+
+                completer.complete::<crate::Result>(
+                    if unsafe {
+                        wingdi::BitBlt(
+                            src.as_ptr().as_ptr().cast(),
+                            src_x,
+                            src_y,
+                            width,
+                            height,
+                            dst.as_ptr().as_ptr().cast(),
+                            dst_x,
+                            dst_y,
+                            op,
+                        )
+                    } == 0
+                    {
+                        Err(crate::Error::win32_error(Some("BitBlt")))
+                    } else {
+                        Ok(())
+                    },
+                );
             }
             Directive::CreateWglContext(dc) => {
                 let res = Glrc::from_ptr(
@@ -691,7 +810,32 @@ impl Directive {
                     },
                 );
             }
-            directive => unreachable!("Got illegal directive: {:?}", directive),
+            Directive::ChoosePixelFormat { dc, pixel_format } => {
+                let pixel_format: wingdi::PIXELFORMATDESCRIPTOR = pixel_format.into_owned().into();
+                let res = unsafe {
+                    wingdi::ChoosePixelFormat(dc.as_ptr().as_ptr().cast(), &pixel_format)
+                };
+                completer.complete::<crate::Result<c_int>>(if res == 0 {
+                    Err(crate::Error::win32_error(Some("ChoosePixelFormat")))
+                } else {
+                    Ok(res)
+                });
+            }
+            Directive::SetPixelFormat {
+                dc,
+                format_id,
+                pixel_format,
+            } => {
+                let pixel_format: wingdi::PIXELFORMATDESCRIPTOR = pixel_format.into_owned().into();
+                let res = unsafe {
+                    wingdi::SetPixelFormat(dc.as_ptr().as_ptr().cast(), format_id, &pixel_format)
+                };
+                completer.complete::<crate::Result>(if res == 0 {
+                    Err(crate::Error::win32_error(Some("SetPixelFormat")))
+                } else {
+                    Ok(())
+                });
+            }
         }
 
         AddOrRemovePtr::DoNothing

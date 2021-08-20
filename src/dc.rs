@@ -1,13 +1,16 @@
 // MIT/Apache2 License
 
 use crate::{
-    color::Color, directive::Directive, gdiobj::GdiObject, server::SendsDirective, task::Task, Key,
-    Point,
+    bitmap::Bitmap, color::Color, directive::Directive, gdiobj::GdiObject, server::SendsDirective,
+    task::Task, Key, Point,
 };
 use std::{borrow::Cow, mem};
 use winapi::{
     ctypes::c_int,
-    shared::minwindef::{BYTE, DWORD},
+    shared::{
+        minwindef::{BYTE, DWORD},
+        windef::COLORREF,
+    },
     um::wingdi,
 };
 
@@ -148,7 +151,73 @@ impl From<PixelType> for BYTE {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum BitBltOp {
+    Blackness,
+    CaptureBlt,
+    DstInvert,
+    MergeCopy,
+    MergePaint,
+    NoMirrorBitmap,
+    NotSrcCopy,
+    NotSrcErase,
+    PatCopy,
+    PatInvert,
+    PatPaint,
+    SrcAnd,
+    SrcCopy,
+    SrcErase,
+    SrcInvert,
+    SrcPaint,
+    Whiteness,
+}
+
 impl Dc {
+    #[inline]
+    pub fn create_compatible_dc<S: SendsDirective>(
+        self,
+        gt: &S,
+    ) -> crate::Result<Task<crate::Result<Dc>>> {
+        gt.send(Directive::CreateCompatibleDc(self))
+    }
+
+    #[inline]
+    pub fn delete_dc<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<()>> {
+        gt.send(Directive::DeleteDc(self))
+    }
+
+    #[inline]
+    pub fn create_compatible_bitmap<S: SendsDirective>(
+        self,
+        gt: &S,
+        width: i32,
+        height: i32,
+    ) -> crate::Result<Task<crate::Result<Bitmap>>> {
+        gt.send(Directive::CreateCompatibleBitmap {
+            dc: self,
+            width,
+            height,
+        })
+    }
+
+    #[inline]
+    pub fn draw_pixels<S: SendsDirective, Pixels: IntoIterator<Item = COLORREF>>(
+        self,
+        gt: &S,
+        origin_x: i32,
+        origin_y: i32,
+        width: i32,
+        pixels: Pixels,
+    ) -> crate::Result<Task<crate::Result<()>>> {
+        gt.send(Directive::SetPixels {
+            dc: self,
+            origin_x,
+            origin_y,
+            width,
+            pixels: pixels.into_iter().collect(),
+        })
+    }
+
     #[inline]
     pub fn select_object<S: SendsDirective>(
         self,

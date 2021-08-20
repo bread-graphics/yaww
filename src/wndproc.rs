@@ -111,11 +111,13 @@ fn inner_wndproc<'evh>(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) ->
     // try to get the default window proc
     let handle = unsafe { Box::from_raw(handle) };
 
-    let default_proc = handle.with(|controller| {
-        controller
-            .subclass(unsafe { NonZeroUsize::new_unchecked(hwnd.as_ptr() as usize) })
-            .unwrap_or(winuser::DefWindowProcA)
-    }).unwrap_or(winuser::DefWindowProcA);
+    let default_proc = handle
+        .with(|controller| {
+            controller
+                .subclass(unsafe { NonZeroUsize::new_unchecked(hwnd.as_ptr() as usize) })
+                .unwrap_or(winuser::DefWindowProcA)
+        })
+        .unwrap_or(winuser::DefWindowProcA);
 
     let res = match exchange_event(hwnd, msg, wparam, lparam, &handle) {
         Some(res) => res,

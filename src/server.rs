@@ -202,6 +202,13 @@ impl<'evh> SendsDirective for PinnedGuiThreadHandle<'evh> {
     }
 }
 
+impl<S: SendsDirective> SendsDirective for &S {
+    #[inline]
+    fn send<T: Any + Send>(&self, directive: Directive) -> crate::Result<Receiver<T>> {
+        (&**self).send(directive)
+    }
+}
+
 const WM_DIRECTIVE: UINT = WM_APP + 0x1337;
 
 /// The inner controller type. Should not be exposed to the public.

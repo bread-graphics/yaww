@@ -8,9 +8,9 @@ use crate::{
     brush::Brush,
     color::Color,
     cursor::Cursor,
-    dc::{Dc, PixelFormat},
+    dc::{BitBltOp, Dc, PixelFormat},
     event::Event,
-    gdiobj::GdiObject,
+    gdiobj::{GdiObject, StockObject},
     glrc::Glrc,
     icon::Icon,
     key::Key,
@@ -25,7 +25,7 @@ use crate::{
 };
 use breadthread::Directive as BtDirective;
 use std::{borrow::Cow, ffi::CStr, num::NonZeroUsize};
-use winapi::ctypes::c_int;
+use winapi::{ctypes::c_int, shared::windef::COLORREF};
 
 #[derive(Debug)]
 #[doc(hidden)]
@@ -100,6 +100,8 @@ pub enum Directive {
     UpdateWindow(Window),
 
     // dc functions
+    CreateCompatibleDc(Dc),
+    DeleteDc(Dc),
     SelectObject {
         dc: Dc,
         obj: GdiObject,
@@ -181,6 +183,17 @@ pub enum Directive {
         dc: Dc,
         points: Cow<'static, [Point]>,
     },
+    BitBlt {
+        src: Dc,
+        dst: Dc,
+        src_x: c_int,
+        src_y: c_int,
+        dst_x: c_int,
+        dst_y: c_int,
+        width: c_int,
+        height: c_int,
+        op: BitBltOp,
+    },
     SwapBuffers(Dc),
 
     // pen functions
@@ -194,8 +207,23 @@ pub enum Directive {
     CreateSolidBrush(Color),
 
     // gdi object functions
+    GetStockObject(StockObject),
     DeleteObject {
         obj: GdiObject,
+    },
+
+    // bitmap functions
+    CreateCompatibleBitmap {
+        dc: Dc,
+        width: i32,
+        height: i32,
+    },
+    SetPixels {
+        dc: Dc,
+        origin_x: i32,
+        origin_y: i32,
+        width: i32,
+        pixels: Vec<COLORREF>,
     },
 
     // wgl functions
@@ -231,16 +259,16 @@ impl BtDirective for Directive {
                 window,
                 new_parent: Some(new_parent),
             } => vec![*window, *new_parent],
-            Directive::SelectObject { dc, obj } => vec![*dc, *obj],
-            Directive::ReleaseDc { window, dc } => vec![*window, *dc],
-            Directive::DeleteObject { obj } => vec![*obj],
-            Directive::MakeWglCurrent {
+            //            Directive::SelectObject { dc, obj } => vec![*dc, *obj],
+            //            Directive::ReleaseDc { window, dc } => vec![*window, *dc],
+            //            Directive::DeleteObject { obj } => vec![*obj],
+            /*            Directive::MakeWglCurrent {
                 dc: Some(dc),
                 rc: Some(rc),
                 ..
-            } => vec![*dc, *rc],
-            Directive::MakeWglCurrent { dc: Some(dc), .. } => vec![*dc],
-            Directive::MakeWglCurrent { rc: Some(rc), .. } => vec![*rc],
+            } => vec![*dc, *rc],*/
+            //            Directive::MakeWglCurrent { dc: Some(dc), .. } => vec![*dc],
+            //            Directive::MakeWglCurrent { rc: Some(rc), .. } => vec![*rc],
             Directive::SetParent { window, .. } => vec![*window],
             /*            Directive::SetPixel { dc, .. }
             | Directive::MoveTo { dc, .. }

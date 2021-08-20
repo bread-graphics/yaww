@@ -3,6 +3,7 @@
 #![cfg(windows)]
 #![allow(unused_unsafe)] // this is done on purpose
 
+pub mod bitmap;
 pub mod brush;
 pub mod color;
 pub mod cursor;
