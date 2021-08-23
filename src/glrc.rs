@@ -1,10 +1,14 @@
 // MIT/Apache2 License
 
-use crate::{dc::Dc, directive::Directive, server::SendsDirective, task::Task, Key};
+use crate::{dc::Dc, directive::Directive, server::SendsDirective, task::Task};
+use breadthread::key_type;
 use std::ptr::NonNull;
-use winapi::ctypes::c_void;
+use winapi::{ctypes::c_void, shared::windef::HGLRC__};
 
-pub type Glrc = Key;
+key_type! {
+    /// A pointer to an OpenGL context.
+    pub struct Glrc(HGLRC__) : [GlrcType, 0x999];
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
@@ -22,6 +26,7 @@ impl GlProc {
         Self { inner }
     }
 
+    /// Resolve this `GlProc` to a pointer.
     #[inline]
     pub fn as_ptr(self) -> *const c_void {
         self.inner.as_ptr() as *const c_void

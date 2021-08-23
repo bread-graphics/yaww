@@ -10,7 +10,7 @@ use winapi::{
 pub enum Error {
     Dynamic(Arc<dyn error::Error + Send + Sync>),
     ServerClosed,
-    InvalidPtrs(Vec<NonZeroUsize>),
+    InvalidPtr(NonZeroUsize),
     Win32 {
         code: DWORD,
         message: CString,
@@ -24,7 +24,7 @@ impl From<breadthread::Error<Error>> for Error {
     #[inline]
     fn from(bt: breadthread::Error<Error>) -> Error {
         match bt {
-            breadthread::Error::InvalidPtrs(ptrs) => Error::InvalidPtrs(ptrs),
+            breadthread::Error::InvalidPtr(p) => Error::InvalidPtr(p),
             breadthread::Error::Closed => Error::ServerClosed,
             breadthread::Error::UnableToComplete => {
                 panic!("yaww should never forget to close its directives")
@@ -43,7 +43,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Dynamic(e) => fmt::Display::fmt(e, f),
-            Error::InvalidPtrs(p) => write!(f, "Invalid pointers: {:?}", p),
+            Error::InvalidPtr(p) => write!(f, "Invalid pointer: {:#010X}", p),
             Error::ServerClosed => {
                 f.write_str("Attempted to send request to the GUI thread after it closed")
             }

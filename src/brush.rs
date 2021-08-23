@@ -1,14 +1,34 @@
 // MIT/Apache2 License
 
 use crate::{
-    color::Color, directive::Directive, gdiobj::GdiObject, server::GuiThread,
-    server::SendsDirective, task::Task,
+    color::Color,
+    directive::Directive,
+    gdiobj::{AsGdiObject, GdiObject, GDI_IDENTIFIER},
+    server::GuiThread,
+    server::SendsDirective,
+    task::Task,
 };
+use breadthread::key_type;
 use orphan_crippler::Receiver;
 use std::num::NonZeroUsize;
-use winapi::um::winuser;
+use winapi::{shared::windef::HBRUSH__, um::winuser};
 
-pub type Brush = GdiObject;
+key_type! {
+    /// A handle to a GDI brush.
+    pub struct Brush(HBRUSH__) : [BrushType, GDI_IDENTIFIER];
+}
+
+impl AsGdiObject for Brush {
+    #[inline]
+    fn into_gdi_object(self) -> GdiObject {
+        GdiObject::from_raw(self.into_raw())
+    }
+
+    #[inline]
+    fn from_gdi_object(obj: GdiObject) -> Self {
+        Self::from_raw(obj.into_raw())
+    }
+}
 
 pub const DEFAULT_BRUSH: Brush = unsafe {
     Brush::from_raw(NonZeroUsize::new_unchecked(

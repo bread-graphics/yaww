@@ -101,6 +101,12 @@ impl<'evh> GuiThread<'evh> {
         self.inner.main_loop()?;
         Ok(())
     }
+
+    /// Manually process pointers.
+    #[inline]
+    pub(crate) fn process_ptrs<I: IntoIterator<Item = AddOrRemovePtr>>(&self, iter: I) {
+        self.inner.process_ptrs(iter);
+    }
 }
 
 /// Handle to the GUI thread.
@@ -125,6 +131,14 @@ impl<'evh> GuiThreadHandle<'evh> {
         PinnedGuiThreadHandle {
             inner: self.inner.pin(),
         }
+    }
+
+    /// Manually process pointers.
+    #[inline]
+    pub(crate) fn process_ptrs<I: IntoIterator<Item = AddOrRemovePtr>>(&self, iter: I) {
+        self.inner
+            .process_ptrs(iter)
+            .expect("Bread thread is dropped?");
     }
 }
 
@@ -172,6 +186,14 @@ impl<'evh> PinnedGuiThreadHandle<'evh> {
         self.inner.process_event(event)?;
         Ok(())
     }
+
+    /// Manually process pointers.
+    #[inline]
+    pub(crate) fn process_ptrs<I: IntoIterator<Item = AddOrRemovePtr>>(&self, iter: I) {
+        self.inner
+            .process_ptrs(iter)
+            .expect("Bread thread is dropped?");
+    }
 }
 
 /// Trait for telling if an object can send a directive.
@@ -179,12 +201,33 @@ pub trait SendsDirective {
     /// Sends a directive.
     #[doc(hidden)]
     fn send<T: Any + Send>(&self, directive: Directive) -> crate::Result<Receiver<T>>;
+
+    /// Process pointers.
+    #[doc(hidden)]
+    fn process_pointers<I: IntoIterator<Item = AddOrRemovePtr>>(&self, iter: I);
+
+    #[doc(hidden)]
+    #[inline]
+    fn add_pointer(&self, ptr: NonZeroUsize, ty: usize) {
+        self.process_pointers(iter::once(AddOrRemovePtr::AddPtr(ptr, ty)))
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    fn remove_pointer(&self, ptr: NonZeroUsize) {
+        self.process_pointers(iter::once(AddOrRemovePtr::RemovePtr(ptr)))
+    }
 }
 
 impl<'evh> SendsDirective for GuiThread<'evh> {
     #[inline]
     fn send<T: Any + Send>(&self, directive: Directive) -> crate::Result<Receiver<T>> {
         self.send_directive(directive)
+    }
+
+    #[inline]
+    fn process_pointers<I: IntoIterator<Item = AddOrRemovePtr>>(&self, iter: I) {
+        self.process_ptrs(iter)
     }
 }
 
@@ -193,6 +236,11 @@ impl<'evh> SendsDirective for GuiThreadHandle<'evh> {
     fn send<T: Any + Send>(&self, directive: Directive) -> crate::Result<Receiver<T>> {
         self.send_directive(directive)
     }
+
+    #[inline]
+    fn process_pointers<I: IntoIterator<Item = AddOrRemovePtr>>(&self, iter: I) {
+        self.process_ptrs(iter)
+    }
 }
 
 impl<'evh> SendsDirective for PinnedGuiThreadHandle<'evh> {
@@ -200,12 +248,22 @@ impl<'evh> SendsDirective for PinnedGuiThreadHandle<'evh> {
     fn send<T: Any + Send>(&self, directive: Directive) -> crate::Result<Receiver<T>> {
         self.send_directive(directive)
     }
+
+    #[inline]
+    fn process_pointers<I: IntoIterator<Item = AddOrRemovePtr>>(&self, iter: I) {
+        self.process_ptrs(iter)
+    }
 }
 
 impl<S: SendsDirective> SendsDirective for &S {
     #[inline]
     fn send<T: Any + Send>(&self, directive: Directive) -> crate::Result<Receiver<T>> {
         (&**self).send(directive)
+    }
+
+    #[inline]
+    fn process_pointers<I: IntoIterator<Item = AddOrRemovePtr>>(&self, iter: I) {
+        (&**self).process_pointers(iter)
     }
 }
 

@@ -21,8 +21,6 @@ pub mod window_class;
 
 pub(crate) mod directive;
 pub(crate) mod error;
-pub(crate) mod future;
-pub(crate) mod key;
 pub(crate) mod server;
 pub(crate) mod util;
 pub(crate) mod vkey;
@@ -36,7 +34,6 @@ pub(crate) mod wndproc;
 pub use color::*;
 pub use error::*;
 pub use event::*;
-pub use key::*;
 pub use server::{GuiThread, GuiThreadHandle, PinnedGuiThreadHandle, SendsDirective};
 pub use task::Task;
 pub use window::*;
@@ -63,6 +60,6 @@ pub struct Point {
 pub mod prelude {
     pub use super::{
         brush::BrushFunctions, glrc::WglFunctions, monitor::MonitorFunctions, pen::PenFunctions,
-        window_class::WcFunctions,
+        window_class::WcFunctions, gdiobj::AsGdiObject, window::WindowFunctions,
     };
 }

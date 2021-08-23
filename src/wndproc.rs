@@ -6,9 +6,10 @@ use crate::{
     server::{PinnedGuiThreadHandle, YawwController},
     vkey::convert_vkey_to_key as convert_vkey,
     window::Window,
+    SendsDirective,
 };
 use std::{
-    mem::{self, MaybeUninit},
+    mem::{self, MaybeUninit, ManuallyDrop},
     num::NonZeroUsize,
     process,
     ptr::{self, NonNull},
@@ -109,7 +110,7 @@ fn inner_wndproc<'evh>(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) ->
     }
 
     // try to get the default window proc
-    let handle = unsafe { Box::from_raw(handle) };
+    let mut handle = ManuallyDrop::new(unsafe { Box::from_raw(handle) });
 
     let default_proc = handle
         .with(|controller| {
@@ -124,9 +125,9 @@ fn inner_wndproc<'evh>(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) ->
         None => unsafe { default_proc(hwnd.as_ptr(), msg, wparam, lparam) },
     };
 
-    if msg != winuser::WM_DESTROY {
-        // avoid dropping handle
-        mem::forget(handle);
+    if msg == winuser::WM_DESTROY {
+        // delete the handle 
+        unsafe { ManuallyDrop::drop(&mut handle) };
     }
 
     res
@@ -140,7 +141,7 @@ fn exchange_event<'evh>(
     lparam: LPARAM,
     window_data: &PinnedGuiThreadHandle<'evh>,
 ) -> Option<LRESULT> {
-    let window = Window::from_ptr_nn(hwnd.cast());
+    let window = Window::from_non_null(hwnd.cast());
 
     match msg {
         winuser::WM_CLOSE => {
@@ -199,7 +200,7 @@ fn exchange_event<'evh>(
             );
         }
         winuser::WM_ACTIVATE => {
-            let other = Window::from_ptr(lparam as *mut ());
+            let other = Window::from_ptr(lparam as *mut () as HWND);
             handle_event(
                 window_data,
                 match wparam as _ {
@@ -225,7 +226,7 @@ fn exchange_event<'evh>(
                 window_data,
                 Event::SetFocus {
                     window,
-                    focus_loser: Window::from_ptr(wparam as *mut ()),
+                    focus_loser: Window::from_ptr(wparam as *mut () as HWND),
                 },
             );
         }
@@ -234,7 +235,7 @@ fn exchange_event<'evh>(
                 window_data,
                 Event::KillFocus {
                     window,
-                    focus_gainer: Window::from_ptr(wparam as *mut ()),
+                    focus_gainer: Window::from_ptr(wparam as *mut () as HWND),
                 },
             );
         }
@@ -252,17 +253,19 @@ fn exchange_event<'evh>(
             let mut ps = MaybeUninit::<winuser::PAINTSTRUCT>::uninit();
             let dc = unsafe { winuser::BeginPaint(hwnd.as_ptr(), ps.as_mut_ptr()) };
 
-            //unsafe { wingdi::LineTo(dc, 300, 300) };
-
             // if we can't paint, not much we can do
-            let dc = match Dc::from_ptr(dc.cast()) {
+            let dc = match Dc::from_ptr(dc) {
                 Some(dc) => dc,
                 None => return None,
             };
 
+            // ensure that "dc" is registered so we don't get directive errors
+            let (k, t) = dc.verifiable();
+            window_data.add_pointer(k, t);
+
             handle_event(window_data, Event::Paint { window, dc });
 
-            //            unsafe { wingdi::LineTo(dc.as_ptr().as_ptr().cast(), 200, 200) };
+            window_data.remove_pointer(k); 
 
             // end the painting process
             unsafe { winuser::EndPaint(hwnd.as_ptr(), ps.as_ptr()) };

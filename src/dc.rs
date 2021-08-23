@@ -1,20 +1,25 @@
 // MIT/Apache2 License
 
 use crate::{
-    bitmap::Bitmap, color::Color, directive::Directive, gdiobj::GdiObject, server::SendsDirective,
-    task::Task, Key, Point,
+    bitmap::Bitmap, color::Color, directive::Directive, gdiobj::{AsGdiObject, GdiObject}, server::SendsDirective,
+    task::Task, Point,
 };
+use breadthread::key_type;
 use std::{borrow::Cow, mem};
 use winapi::{
     ctypes::c_int,
     shared::{
         minwindef::{BYTE, DWORD},
-        windef::COLORREF,
+        windef::{COLORREF, HDC__},
     },
     um::wingdi,
 };
 
-pub type Dc = Key;
+key_type! {
+    /// A drawing context. This either points to a window, to a location in memory, to a screen, or some other
+    /// exotic location.
+    pub struct Dc(HDC__) : [DcType, 0x991];
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PixelFormat {
@@ -182,7 +187,7 @@ impl Dc {
     }
 
     #[inline]
-    pub fn delete_dc<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<()>> {
+    pub fn delete<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<()>> {
         gt.send(Directive::DeleteDc(self))
     }
 
@@ -219,12 +224,12 @@ impl Dc {
     }
 
     #[inline]
-    pub fn select_object<S: SendsDirective>(
+    pub fn select_object<S: SendsDirective, O: AsGdiObject>(
         self,
         gt: &S,
-        obj: GdiObject,
+        obj: O,
     ) -> crate::Result<Task<crate::Result<GdiObject>>> {
-        gt.send(Directive::SelectObject { dc: self, obj })
+        gt.send(Directive::SelectObject { dc: self, obj: obj.into_gdi_object() })
     }
 
     #[inline]
@@ -412,5 +417,10 @@ impl Dc {
             dc: self,
             points: points.into(),
         })
+    }
+
+    #[inline]
+    pub fn bit_blt<S: SendsDirective>(self, gt: &S, src_x: c_int, src_y: c_int, width: c_int, height: c_int, dst: Dc, dst_x: c_int, dst_y: c_int, op: BitBltOp) -> crate::Result<Task<crate::Result>> {
+        gt.send(Directive::BitBlt { src: self, dst, src_x, src_y, width, height, dst_x, dst_y, op })
     }
 }

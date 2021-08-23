@@ -1,7 +1,10 @@
 // MIT/Apache2 License
 
+#[cfg(windows)]
 use const_cstr::const_cstr;
+#[cfg(windows)]
 use yaww::{
+    prelude::*,
     brush::DEFAULT_BRUSH,
     window::{ExtendedWindowStyle, ShowWindowCommand, WindowStyle},
     window_class::ClassStyle,
@@ -9,11 +12,13 @@ use yaww::{
     Event, Color, GuiThread, Result,
 };
 
+#[cfg(windows)]
 const_cstr! {
     CLASS_NAME = "yaww-example-class";
     WINDOW_NAME = "YAWW Basic Example";
 }
 
+#[cfg(windows)]
 fn main() -> Result {
     env_logger::Builder::new()
         .filter(Some("yaww"), log::LevelFilter::Trace)
@@ -71,7 +76,7 @@ fn main() -> Result {
 
         match ev {
             Event::KeyDown { .. } => window
-                .move_window(gt, 20, 20, 600, 600, true)
+                .move_resize_window(gt, 20, 20, 600, 600, true)
                 .unwrap()
                 .wait()
                 .unwrap(),
@@ -94,15 +99,20 @@ fn main() -> Result {
                 dc.select_object(gt, hold_brush).unwrap().wait().unwrap();
             }
             Event::Quit => {
-                pen.delete_gdi(gt).unwrap().wait();
+                pen.delete(gt).unwrap().wait();
             }
             _ => (),
         }
 
         Ok(())
-    })?.wait();
+    });
 
     window.invalidate_rect(&gt, None, true)?.wait()?;
-    gt.main_loop()?.wait();
+    gt.main_loop()?;
     Ok(())
+}
+
+#[cfg(not(windows))]
+fn main() {
+    println!("yaww only works on Windows platforms");
 }

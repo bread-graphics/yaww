@@ -1,9 +1,13 @@
 // MIT/Apache2 License
 
-use crate::{directive::Directive, key::Key, server::SendsDirective, task::Task};
-use winapi::shared::ntdef::LONG;
+use crate::{directive::Directive, server::SendsDirective, task::Task};
+use breadthread::key_type;
+use winapi::shared::{ntdef::LONG, windef::HMONITOR__};
 
-pub type Monitor = Key;
+key_type! {
+    /// A handle to a Win32 monitor.
+    pub struct Monitor(HMONITOR__) : [MonitorType, 0x994];
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MonitorInfo {

@@ -1,13 +1,21 @@
 // MIT/Apache2 License
 
-use crate::{directive::Directive, menu::Menu, server::SendsDirective, task::Task, Key, Rectangle};
+use crate::{directive::Directive, menu::Menu, server::SendsDirective, task::Task, Rectangle};
+use breadthread::key_type;
 use std::{
     borrow::Cow,
     ffi::{CStr, CString},
 };
-use winapi::{ctypes::c_int, shared::minwindef::DWORD, um::winuser};
+use winapi::{
+    ctypes::c_int,
+    shared::{minwindef::DWORD, windef::HWND__},
+    um::winuser,
+};
 
-pub type Window = Key;
+key_type! {
+    /// A handle to a Win32 window. This represents a rectangles of pixels on the screen.
+    pub struct Window(HWND__) : [WindowType, 0x990];
+}
 
 pub trait WindowFunctions {
     /// Create a new window.
@@ -68,6 +76,7 @@ impl<S: SendsDirective> WindowFunctions for S {
 }
 
 impl Window {
+    /// Send a `ShowWindowCommand` to the `Window`. This is usually used to either show or hide the `Window`.
     #[inline]
     pub fn show<S: SendsDirective>(
         self,
@@ -80,6 +89,7 @@ impl Window {
         })
     }
 
+    /// Alter the dimensions of the `Window`.
     #[inline]
     pub fn move_resize_window<S: SendsDirective>(
         self,
@@ -102,6 +112,7 @@ impl Window {
         })
     }
 
+    /// Move the `Window` to another location.
     #[inline]
     pub fn move_window<S: SendsDirective>(
         self,
@@ -122,6 +133,7 @@ impl Window {
         })
     }
 
+    /// Change the `Window`'s size.
     #[inline]
     pub fn resize_window<S: SendsDirective>(
         self,
@@ -142,11 +154,13 @@ impl Window {
         })
     }
 
+    /// Close the `Window`.
     #[inline]
     pub fn close<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<crate::Result>> {
         gt.send(Directive::CloseWindow(self))
     }
 
+    /// Get the rectangle defining the `Window`'s client area.
     #[inline]
     pub fn get_client_rect<S: SendsDirective>(
         self,
@@ -155,6 +169,7 @@ impl Window {
         gt.send(Directive::GetClientRect(self))
     }
 
+    /// Get the rectangle defining the `Window`'s total area.
     #[inline]
     pub fn get_window_rect<S: SendsDirective>(
         self,
@@ -163,6 +178,7 @@ impl Window {
         gt.send(Directive::GetWindowRect(self))
     }
 
+    /// Get the `Window`'s parent.
     #[inline]
     pub fn get_parent<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<Option<Window>>> {
         gt.send(Directive::GetParent(self))
@@ -177,6 +193,7 @@ impl Window {
         gt.send(Directive::GetWindowText(self))
     }
 
+    /// Is this `Window` the child of another `Window`?
     #[inline]
     pub fn is_child_of<S: SendsDirective>(
         self,
@@ -189,11 +206,13 @@ impl Window {
         })
     }
 
+    /// Is this window zoomed?
     #[inline]
     pub fn is_zoomed<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<bool>> {
         gt.send(Directive::IsZoomed(self))
     }
 
+    /// Set the parent for this window.
     #[inline]
     pub fn set_parent<S: SendsDirective>(
         self,
@@ -206,6 +225,7 @@ impl Window {
         })
     }
 
+    /// Set the text for this window.
     #[inline]
     pub fn set_window_text<S: SendsDirective>(
         self,
@@ -215,11 +235,13 @@ impl Window {
         gt.send(Directive::SetWindowText { window: self, text })
     }
 
+    /// Update this window.
     #[inline]
     pub fn update_window<S: SendsDirective>(self, gt: &S) -> crate::Result<Task<crate::Result>> {
         gt.send(Directive::UpdateWindow(self))
     }
 
+    /// Invalidate this window's area, forcing a repaint.
     #[inline]
     pub fn invalidate_rect<S: SendsDirective>(
         self,

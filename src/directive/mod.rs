@@ -13,7 +13,6 @@ use crate::{
     gdiobj::{GdiObject, StockObject},
     glrc::Glrc,
     icon::Icon,
-    key::Key,
     menu::Menu,
     monitor::Monitor,
     pen::PenStyle,
@@ -25,6 +24,7 @@ use crate::{
 };
 use breadthread::Directive as BtDirective;
 use std::{borrow::Cow, ffi::CStr, num::NonZeroUsize};
+use tinyvec::{array_vec, ArrayVec, ArrayVecIterator};
 use winapi::{ctypes::c_int, shared::windef::COLORREF};
 
 #[derive(Debug)]
@@ -245,32 +245,76 @@ pub enum Directive {
     GetWglProcAddress(Cow<'static, CStr>),
 }
 
+#[doc(hidden)]
+pub struct KeyPairThatWeCanApplyDefaultTo {
+    key: NonZeroUsize,
+    ty: usize,
+}
+
+impl Default for KeyPairThatWeCanApplyDefaultTo {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            key: NonZeroUsize::new(usize::MAX).unwrap(),
+            ty: 0,
+        }
+    }
+}
+
+impl From<(NonZeroUsize, usize)> for KeyPairThatWeCanApplyDefaultTo {
+    #[inline]
+    fn from(kp: (NonZeroUsize, usize)) -> Self {
+        let (key, ty) = kp;
+        Self { key, ty }
+    }
+}
+
+impl KeyPairThatWeCanApplyDefaultTo {
+    #[inline]
+    fn as_tuple(self) -> (NonZeroUsize, usize) {
+        let Self { key, ty } = self;
+        (key, ty)
+    }
+}
+
+/// Backing type.
+type BT = [KeyPairThatWeCanApplyDefaultTo; 2];
+
 impl BtDirective for Directive {
-    type Pointers = iter::Map<VecIter<Key>, fn(Key) -> NonZeroUsize>;
+    type Pointers = iter::Map<
+        ArrayVecIterator<BT>,
+        fn(KeyPairThatWeCanApplyDefaultTo) -> (NonZeroUsize, usize),
+    >;
 
     #[inline]
     fn pointers(&self) -> Self::Pointers {
-        match self {
+        let list: ArrayVec<BT> = match self {
             Directive::CreateWindow { parent, .. } => {
-                parent.into_iter().copied().collect::<Vec<Key>>()
+                parent.into_iter().map(|t| t.verifiable().into()).collect()
             }
-            Directive::IsChild { parent, child } => vec![*parent, *child],
+            Directive::IsChild { parent, child } => {
+                array_vec![parent.verifiable().into(), child.verifiable().into()]
+            }
             Directive::SetParent {
                 window,
                 new_parent: Some(new_parent),
-            } => vec![*window, *new_parent],
-            //            Directive::SelectObject { dc, obj } => vec![*dc, *obj],
-            //            Directive::ReleaseDc { window, dc } => vec![*window, *dc],
-            //            Directive::DeleteObject { obj } => vec![*obj],
-            /*            Directive::MakeWglCurrent {
+            } => array_vec![window.verifiable().into(), new_parent.verifiable().into()],
+            Directive::SelectObject { dc, obj } => {
+                array_vec![dc.verifiable().into(), obj.verifiable().into()]
+            }
+            Directive::ReleaseDc { window, dc } => {
+                array_vec![window.verifiable().into(), dc.verifiable().into()]
+            }
+            Directive::DeleteObject { obj } => array_vec![obj.verifiable().into()],
+            Directive::MakeWglCurrent {
                 dc: Some(dc),
                 rc: Some(rc),
                 ..
-            } => vec![*dc, *rc],*/
-            //            Directive::MakeWglCurrent { dc: Some(dc), .. } => vec![*dc],
-            //            Directive::MakeWglCurrent { rc: Some(rc), .. } => vec![*rc],
-            Directive::SetParent { window, .. } => vec![*window],
-            /*            Directive::SetPixel { dc, .. }
+            } => array_vec![dc.verifiable().into(), rc.verifiable().into()],
+            Directive::MakeWglCurrent { dc: Some(dc), .. } => array_vec![dc.verifiable().into()],
+            Directive::MakeWglCurrent { rc: Some(rc), .. } => array_vec![rc.verifiable().into()],
+            Directive::SetParent { window, .. } => array_vec![window.verifiable().into()],
+            Directive::SetPixel { dc, .. }
             | Directive::MoveTo { dc, .. }
             | Directive::LineTo { dc, .. }
             | Directive::Rectangle { dc, .. }
@@ -281,24 +325,26 @@ impl BtDirective for Directive {
             | Directive::Polygon { dc, .. }
             | Directive::Polyline { dc, .. }
             | Directive::ChoosePixelFormat { dc, .. }
-            | Directive::SetPixelFormat { dc, .. } => vec![dc],*/
+            | Directive::SetPixelFormat { dc, .. } => array_vec![dc.verifiable().into()],
             Directive::ShowWindow { window, .. }
             | Directive::InvalidateRect { window, .. }
             | Directive::MoveWindow { window, .. }
-            | Directive::SetWindowText { window, .. } => vec![*window],
+            | Directive::SetWindowText { window, .. } => array_vec![window.verifiable().into()],
             Directive::CloseWindow(w)
             | Directive::GetClientRect(w)
             | Directive::GetParent(w)
             | Directive::GetWindowRect(w)
             | Directive::GetWindowText(w)
             | Directive::IsZoomed(w)
-            | Directive::UpdateWindow(w)
-            | Directive::SwapBuffers(w)
-            | Directive::CreateWglContext(w)
-            | Directive::DestroyWglContext(w) => vec![*w],
-            _ => vec![],
-        }
-        .into_iter()
-        .map(|k| k.into())
+            | Directive::UpdateWindow(w) => array_vec![w.verifiable().into()],
+            Directive::DestroyWglContext(w) => array_vec![w.verifiable().into()],
+            Directive::SwapBuffers(w) | Directive::CreateWglContext(w) => {
+                array_vec![w.verifiable().into()]
+            }
+            _ => array_vec![],
+        };
+
+        list.into_iter()
+            .map(KeyPairThatWeCanApplyDefaultTo::as_tuple)
     }
 }
