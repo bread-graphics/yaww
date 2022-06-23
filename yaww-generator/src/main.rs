@@ -1,15 +1,22 @@
 // MIT/Apache2 License
 
+#![forbid(unsafe_code)]
+
 use anyhow::{anyhow, Context, Result};
 use glob::Pattern;
+use indenter::{indented, Indented};
 use std::{
     borrow::Cow,
-    collections::BTreeMap,
-    env, fmt, fs,
-    io::{prelude::*, BufReader, BufWriter},
+    cmp,
+    collections::{BTreeMap, VecDeque},
+    env,
+    fmt::{self, Write},
+    fs,
+    io::{prelude::*, BufReader, BufWriter, Write as _},
     mem,
     rc::Rc,
 };
+use take_mut::take;
 use windows_metadata::reader::{ConstantValue, MethodDef, Type, TypeDef};
 
 fn main() -> Result<()> {
@@ -42,7 +49,9 @@ fn main() -> Result<()> {
 
     // construct the state for producing types
     let modules = mem::take(&mut config.directives.modules);
-    let mut state = State::new(config, &mut sw_output, &mut y_output)?;
+    let mut sw_buffer = String::new();
+    let mut y_buffer = String::new();
+    let mut state = State::new(config, &mut sw_buffer, &mut y_buffer)?;
 
     // iterate over the modules we want
     for module in &modules {
@@ -63,16 +72,21 @@ fn main() -> Result<()> {
     state.handle_items()?;
     state.handle_methods()?;
 
+    // write the output
+    sw_output.write_all(sw_buffer.as_bytes())?;
+    y_output.write_all(y_buffer.as_bytes())?;
+
     Ok(())
 }
 
 pub struct State<'s> {
     pub config: Config<'s>,
     pub ignore_globs: Vec<Pattern>,
+    pub actual_bool_globs: Vec<Pattern>,
 
-    pub sw_output: &'s mut dyn Write,
-    pub y_output: &'s mut dyn Write,
-    pub current_indent: usize,
+    sw_output: Indented<'s, String>,
+    y_output: Indented<'s, String>,
+    indent: usize,
 
     pub current_namespace: Option<&'s str>,
     pub items: BTreeMap<String, Rc<Item>>,
@@ -93,11 +107,13 @@ pub struct DeferredTypeDef<'s> {
     typedef: &'static TypeDef,
 }
 
+const INDENT: &str = "                                                                        ";
+
 impl<'s> State<'s> {
     fn new(
         config: Config<'s>,
-        sw_output: &'s mut dyn Write,
-        y_output: &'s mut dyn Write,
+        sw_output: &'s mut String,
+        y_output: &'s mut String,
     ) -> Result<Self> {
         Ok(Self {
             ignore_globs: config
@@ -106,11 +122,17 @@ impl<'s> State<'s> {
                 .iter()
                 .map(|p| Pattern::new(p))
                 .collect::<Result<Vec<_>, _>>()?,
+            actual_bool_globs: config
+                .directives
+                .actual_bools
+                .iter()
+                .map(|p| Pattern::new(p))
+                .collect::<Result<Vec<_>, _>>()?,
             config,
-            sw_output,
-            y_output,
+            sw_output: indented(sw_output).with_str(""),
+            y_output: indented(y_output).with_str(""),
+            indent: 0,
             current_namespace: None,
-            current_indent: 0,
             items: BTreeMap::new(),
             callbacks_deferred: Vec::new(),
             methods_deferred: Vec::new(),
@@ -119,10 +141,26 @@ impl<'s> State<'s> {
         })
     }
 
+    fn update_indent(&mut self) {
+        let indentation = &INDENT[..self.indent * 4];
+        take(&mut self.sw_output, |s| s.with_str(indentation));
+        take(&mut self.y_output, |y| y.with_str(indentation));
+    }
+
+    fn bump_indent(&mut self) {
+        self.indent += 1;
+        self.update_indent();
+    }
+
+    fn unbump_indent(&mut self) {
+        self.indent = cmp::max(0, self.indent - 1);
+        self.update_indent();
+    }
+
     pub fn indent<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
-        self.current_indent += 1;
+        self.bump_indent();
         let r = f(self);
-        self.current_indent -= 1;
+        self.unbump_indent();
         r
     }
 
@@ -193,6 +231,8 @@ impl<'s> State<'s> {
                         name: Cow::Owned(base_name.clone()),
                         is_union: true,
                         fields: fields,
+                        namespace: self.current_namespace.unwrap().to_string(),
+                        packing: None,
                     });
                     self.items.insert(base_name, item.clone());
                     return Ok(types::Type::Item(item));
@@ -250,6 +290,8 @@ impl<'s> State<'s> {
             name: Cow::Borrowed(td.name()),
             is_union: false,
             fields,
+            namespace: self.current_namespace.unwrap().to_string(),
+            packing: td.class_layout().map(|l| l.packing_size() as usize),
         })
     }
 
@@ -273,6 +315,8 @@ impl<'s> State<'s> {
             {
                 Some(Item::ForeignHandle(td.name()))
             } else {
+                let namespace = types::format_namespace(self.current_namespace.unwrap());
+                swwriteln!(self, "pub use {}::{};", namespace, td.name())?;
                 Some(Item::AlreadyImported(td.name()))
             }
         } else if td.is_primitive() {
@@ -398,11 +442,13 @@ impl<'s> State<'s> {
                 .params
                 .iter()
                 .map(|param| {
-                    self.get_item(&param.ty).map(|ty| Param {
-                        name: param.def.name(),
-                        ty,
-                        variation: param.def.flags().into(),
-                        optional: param.def.flags().optional(),
+                    self.get_item(&param.ty).map(|ty| {
+                        Param::new(
+                            param.def.name(),
+                            ty,
+                            param.def.flags().into(),
+                            param.def.flags().optional(),
+                        )
                     })
                 })
                 .collect::<Result<_>>()
@@ -454,59 +500,48 @@ impl<'s> State<'s> {
                 .params
                 .iter()
                 .map(|param| {
-                    self.get_item(&param.ty).map(|ty| Param {
-                        name: param.def.name(),
-                        ty,
-                        variation: param.def.flags().into(),
-                        optional: param.def.flags().optional(),
+                    self.get_item(&param.ty).map(|ty| {
+                        Param::new(
+                            param.def.name(),
+                            ty,
+                            param.def.flags().into(),
+                            param.def.flags().optional(),
+                        )
                     })
                 })
-                .collect::<Result<_>>()
+                .collect::<Result<Vec<_>>>()
                 .with_context(|| format!("finding params for {}", md.name()))?;
+
+            // skip if this involves interfaces in any way
+            if return_type
+                .iter()
+                .chain(params.iter().map(|p| &p.ty))
+                .any(|ty| ty.is_interface())
+            {
+                continue 'l;
+            }
 
             let function = Function {
                 name: md.name(),
                 params,
                 return_type,
+                namespace: namespace.to_string(),
             };
-            function.write(self)?;
+            function
+                .write(self)
+                .with_context(|| format!("Writing function {}", md.name()))?;
         }
 
         Ok(())
     }
 
     pub fn write_sw(&mut self, args: fmt::Arguments<'_>) -> Result<()> {
-        let data_to_write = args.to_string();
-        if !data_to_write.contains('\n') {
-            write!(self.sw_output, "{}", &data_to_write)?;
-        } else {
-            for line in data_to_write.lines() {
-                writeln!(self.sw_output, "{}{}", Indent(self.current_indent), line)?;
-            }
-        }
+        self.sw_output.write_fmt(args)?;
         Ok(())
     }
 
     pub fn write_y(&mut self, args: fmt::Arguments<'_>) -> Result<()> {
-        let data_to_write = args.to_string();
-        if !data_to_write.contains('\n') {
-            write!(self.sw_output, "{}", &data_to_write)?;
-        } else {
-            for line in data_to_write.lines() {
-                writeln!(self.y_output, "{}{}", Indent(self.current_indent), line)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-struct Indent(usize);
-
-impl fmt::Display for Indent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for _ in 0..self.0 {
-            write!(f, "    ")?;
-        }
+        self.y_output.write_fmt(args)?;
         Ok(())
     }
 }
