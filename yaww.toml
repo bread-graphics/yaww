@@ -7,7 +7,8 @@ modules = [
     'Windows.Win32.UI.Controls',
     'Windows.Win32.UI.Shell',
     'Windows.Win32.UI.WindowsAndMessaging',
-    'Windows.Win32.System.LibraryLoader'
+    'Windows.Win32.System.LibraryLoader',
+    'Windows.Win32.Graphics.OpenGL',
 ]
 ignore = [
     "LPFNDFMCALLBACK",
@@ -33,6 +34,7 @@ ignore = [
     "ShellExecuteEx*",
     "RegisterDeviceNotification*",
     "SHARD*",
+    "SHAn*",
     "SFV_*",
     "SHCo*",
     "SHCO*",
@@ -45,9 +47,11 @@ ignore = [
     "SHGe*",
     "SHPa*",
     "SHQu*",
+    "SHFo*",
     "SHFI*",
     "SHFi*",
     "SHNA*",
+    "SHLo*",
     "SHRe*",
     "SHSe*",
     "SHOp*",
@@ -58,6 +62,7 @@ ignore = [
     "SHDR*",
     "SHDE*",
     "SORT*",
+    "SHUn*",
     "SYNCMGR*",
     "WINDOWDATA",
     "Reg*Key*",
@@ -88,10 +93,24 @@ ignore = [
     "INPUT_TRANS*",
     "*InputTransform*",
     "Sys*",
+    "GetTheme*",
+    "CreateProfile",
+    "NMT*",
+    "NMB*",
+    "gl*",
+    "EnumMetaFile",
 ]
 actual_bools = [
     "*_visible*",
     "*_in_*",
     "in_*",
     "*is_*",
+    "equal_*",
+    "translate_message",
+]
+dont_merge = [
+    "cchText",
+    "c*Desired",
+    "nIDEvent",
+    "cWidth",
 ]

@@ -1,58 +1,28 @@
 // MIT/Apache2 License
 
-use crate::{swwriteln, State};
+use crate::{fits_globs, swwriteln, types::ty::PtrClass, State};
 use anyhow::{anyhow, Context, Result};
-use heck::{
-    AsLowerCamelCase, AsShoutySnakeCase, AsSnakeCase, AsUpperCamelCase, ToSnakeCase,
-    ToUpperCamelCase,
-};
-use once_cell::unsync::OnceCell;
+use heck::{AsSnakeCase, AsUpperCamelCase};
 use std::{
-    borrow::Cow,
-    cell::RefCell,
     fmt::{self, Write},
-    rc::Rc,
-    sync::atomic::{AtomicUsize, Ordering::Relaxed},
+    ops::Index,
 };
+use take_mut::take;
 use windows_metadata::reader::{self, ParamFlags};
+
+mod structure;
+pub use structure::{Field, ResolveLater};
+
+mod item;
+pub use item::Item;
 
 mod ty;
 pub use ty::Type;
 
-// TODO: setup callback for returnable_expr()
-
 #[derive(Debug, PartialEq, Eq)]
-pub enum Item {
-    /// An item we already import from `windows-rs`.
-    AlreadyImported(&'static str),
-    /// A handle to a foreign resource.
-    ///
-    /// Implied not to be thread safe.
-    ForeignHandle(&'static str),
-    /// A function type with the given types as arguments.
-    FunctionType {
-        name: &'static str,
-        params: Vec<Param>,
-        return_type: Option<Type>,
-    },
-    /// Special type.
-    Special(Special),
-    /// A struct type.
-    Structure {
-        name: Cow<'static, str>,
-        is_union: bool,
-        fields: Vec<Field>,
-        namespace: String,
-        packing: Option<usize>,
-    },
-    /// A set of constants.
-    ConstantSet {
-        name: &'static str,
-        constants: Vec<Constant>,
-        ty: Type,
-    },
-    /// Interface item, desist immediately.
-    Interface,
+pub enum Special {
+    Wparam,
+    Lparam,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -61,7 +31,7 @@ pub struct Constant {
     pub value: Value,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Number(i128),
     String(String),
@@ -83,341 +53,12 @@ impl fmt::Display for Value {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Field {
-    pub name: Cow<'static, str>,
-    pub ty: ResolveLater,
-}
-
-impl Field {
-    pub fn ty(&self, state: &mut State<'_>) -> Result<&Type> {
-        self.ty
-            .resolved
-            .get_or_try_init(|| state.get_item(&*self.ty.unresolved.as_ref().unwrap().0))
-            .with_context(|| format!("Resolving field {}", self.name))
-    }
-}
-
-#[derive(Debug)]
-pub struct ResolveLater {
-    unresolved: Option<crate::DebugType<'static>>,
-    resolved: OnceCell<Type>,
-}
-
-// these are 100% broken but I don't care
-
-impl PartialEq for ResolveLater {
-    fn eq(&self, other: &Self) -> bool {
-        self.resolved == other.resolved
-    }
-}
-
-impl Eq for ResolveLater {}
-
-impl ResolveLater {
-    pub fn resolved(ty: Type) -> Self {
-        ResolveLater {
-            unresolved: None,
-            resolved: OnceCell::with_value(ty),
-        }
-    }
-
-    pub fn unresolved(ty: impl Into<crate::DebugType<'static>>) -> Self {
-        ResolveLater {
-            unresolved: Some(ty.into()),
-            resolved: OnceCell::new(),
-        }
-    }
-}
-
-fn struct_impl_block(
-    name: &str,
-    fields: &[Field],
-    is_union: bool,
-    namespace: &str,
-    state: &mut State<'_>,
-) -> Result<()> {
-    // whether or not all fields are thin
-    let is_thin = fields
-        .iter()
-        .map(|f| f.ty(state)?.thin(state))
-        .try_fold(true, |acc, b| anyhow::Ok(acc && b?))?;
-
-    let display_name = name.to_upper_camel_case();
-    let namespace = format_namespace(namespace);
-    let win32_name = format!("{}::{}", namespace, name);
-
-    swwriteln!(state, "impl {} {{", &display_name)?;
-    state.indent(|state| {
-        // method to convert to win32
-        swwriteln!(state, "fn to_win32(&self) -> {} {{", &win32_name)?;
-        state.indent(|state| {
-            // if this is a thin struct, just transmute
-            if is_thin {
-                swwriteln!(state, "// SAFETY: this is a thin struct")?;
-                swwriteln!(state, "unsafe {{ std::mem::transmute_copy(self) }}")
-            } else {
-                // deconstruct this struct
-                swwrite!(state, "let Self {{ ")?;
-                for (i, field) in fields.iter().enumerate() {
-                    swwrite!(state, "{}", Sanitize(&field.name))?;
-                    if i != fields.len() - 1 {
-                        swwrite!(state, ", ")?;
-                    }
-                }
-                swwriteln!(state, " }} = self;")?;
-
-                // begin converting fields to other fields
-                for field in fields {
-                    let fname = FieldName(&field.name).to_string();
-                    let rname = &field.name;
-                    let expr = field.ty(state)?.to_win32(&fname, state)?;
-                    swwriteln!(state, "let {} = {};", Sanitize(rname), expr)?;
-                }
-
-                // construct the new edition
-                swwrite!(state, "{} {{ ", win32_name)?;
-                for (i, field) in fields.iter().enumerate() {
-                    swwrite!(state, "{}", Sanitize(&field.name))?;
-                    if i != fields.len() - 1 {
-                        swwrite!(state, ", ")?;
-                    }
-                }
-                swwriteln!(state, " }}")
-            }
-        })?;
-        swwriteln!(state, "}}")?;
-
-        // method to convert from win32
-        swwriteln!(
-            state,
-            "unsafe fn from_win32(win32: {}) -> Self {{",
-            &win32_name
-        )?;
-        state.indent(|state| {
-            if is_thin {
-                swwriteln!(state, "// SAFETY: this is a thin struct")?;
-                swwriteln!(state, "std::mem::transmute(win32)")
-            } else {
-                // deconstruct the struct
-                swwrite!(state, "let {} {{ ", &win32_name)?;
-                for (i, field) in fields.iter().enumerate() {
-                    swwrite!(state, "{}", Sanitize(&field.name))?;
-                    if i != fields.len() - 1 {
-                        swwrite!(state, ", ")?;
-                    }
-                }
-                swwriteln!(state, " }} = win32;")?;
-
-                // begin converting fields to other fields
-                for field in fields {
-                    let fname = Sanitize(&field.name).to_string();
-                    let rname = FieldName(&field.name).to_string();
-                    let expr = field.ty(state)?.from_win32(&fname, state)?;
-                    swwriteln!(state, "let {} = {};", Sanitize(rname), expr)?;
-                }
-
-                // construct the new edition
-                swwrite!(state, "Self {{ ")?;
-                for (i, field) in fields.iter().enumerate() {
-                    swwrite!(state, "{}", FieldName(&field.name))?;
-                    if i != fields.len() - 1 {
-                        swwrite!(state, ", ")?;
-                    }
-                }
-                swwriteln!(state, " }}")
-            }
-        })?;
-        swwriteln!(state, "}}")?;
-
-        anyhow::Ok(())
-    })?;
-    swwriteln!(state, "}}")?;
-
-    Ok(())
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Special {
-    Lparam,
-    Wparam,
-}
-
-impl Item {
-    pub fn name(&self) -> Cow<'static, str> {
-        match self {
-            Self::AlreadyImported(name) | Self::ForeignHandle(name) => (*name).into(),
-            Self::FunctionType { name, .. } => (*name).into(),
-            Self::ConstantSet { name, .. } => (*name).into(),
-            Self::Structure { name, .. } => name.clone(),
-            Self::Interface => "interface".into(),
-            Self::Special(Special::Wparam) => "Wparam".into(),
-            Self::Special(Special::Lparam) => "Lparam".into(),
-        }
-    }
-
-    pub fn write(&self, state: &mut State<'_>) -> Result<()> {
-        match self {
-            Self::AlreadyImported(..)
-            | Self::FunctionType { .. }
-            | Self::Special(..)
-            | Self::Interface => { /* do nothing */ }
-            Self::Structure {
-                name,
-                is_union,
-                fields,
-                namespace,
-                packing,
-            } => {
-                // zsts dont exist in win32
-                if fields.is_empty() {
-                    return Ok(());
-                }
-
-                let is_union = *is_union;
-                // don't write if we contain an interface
-                if fields.iter().try_fold(false, |acc, f| {
-                    anyhow::Ok(acc || f.ty(state)?.is_interface())
-                })? {
-                    return Ok(());
-                }
-
-                if !is_union {
-                    swwriteln!(
-                        state,
-                        "#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]"
-                    )?;
-                }
-
-                swwrite!(state, "#[repr(C")?;
-                if let Some(packing) = packing {
-                    swwrite!(state, ", packed({})", packing)?;
-                }
-                swwriteln!(state, ")]")?;
-
-                swwrite!(state, "pub ")?;
-                if is_union {
-                    swwrite!(state, "union ")?;
-                } else {
-                    swwrite!(state, "struct ")?;
-                }
-                swwrite!(state, "{}", AsUpperCamelCase(name))?;
-
-                if fields.iter().try_fold(false, |acc, f| {
-                    anyhow::Ok(acc || f.ty(state)?.needs_lifetime(state)?)
-                })? {
-                    swwrite!(state, "<'a>")?;
-                }
-                swwriteln!(state, " {{")?;
-
-                // write all of the fields
-                state.indent(|state| {
-                    for field in fields {
-                        let ty = field.ty(state)?;
-                        let fp = ty.field_position(state)?;
-                        swwriteln!(state, "pub {}: {},", FieldName(&field.name), fp)?;
-                    }
-
-                    anyhow::Ok(())
-                })?;
-
-                swwriteln!(state, "}}")?;
-
-                // write the impl block
-                struct_impl_block(name, fields, is_union, namespace, state)?;
-            }
-            Self::ConstantSet {
-                name,
-                constants,
-                ty,
-            } => {
-                for constant in constants {
-                    // write the constant line
-                    swwriteln!(
-                        state,
-                        "pub const {}: {} = {};",
-                        AsShoutySnakeCase(constant.name),
-                        ty.const_position()?,
-                        constant.value
-                    )?;
-                }
-            }
-            Self::ForeignHandle(name) => {
-                swwriteln!(
-                    state,
-                    r#"
-#[repr(transparent)]
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct {0} {{
-    handle: isize, 
-    _thread_unsafe: PhantomData<*mut ()>,
-}}
-
-impl {0} {{
-    pub const fn null() -> Self {{
-        // SAFETY: null is always a valid pointer
-        unsafe {{ Self::new(0) }}
-    }}
-
-    pub const unsafe fn new(handle: isize) -> Self {{
-        Self {{
-            handle,
-            _thread_unsafe: PhantomData,
-        }}
-    }}
-
-    pub fn into_raw(self) -> isize {{
-        self.handle
-    }}
-}}
-
-impl fmt::Debug for {0} {{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {{
-        fmt::UpperHex::fmt(&self.handle, f)
-    }}
-}}
-
-#[cfg(feature = "breadthread")]
-unsafe impl breadthread::Compatible for {0} {{
-    fn representative(&self) -> usize {{
-        self.into_raw() as usize
-    }}
-}}
-                    "#,
-                    AsUpperCamelCase(name),
-                )?;
-
-                ywriteln!(
-                    state,
-                    "
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct {0} <Tag = YawwTag> {{
-    inner: Object<safer_wingui::{0}, Tag>,
-}}
-
-impl<Tag> {0}<Tag> {{
-    pub(crate) fn new(inner: Object<safer_wingui::{0}, Tag>) -> Self {{
-        Self {{
-            inner,
-        }}
-    }}
-}}
-                    ",
-                    AsUpperCamelCase(name),
-                )?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
 #[derive(Debug)]
 pub struct Function {
     pub name: &'static str,
     pub return_type: Option<Type>,
     pub params: Vec<Param>,
+    pub merged_params: Vec<usize>,
     pub namespace: String,
 }
 
@@ -441,6 +82,10 @@ impl Param {
             optional,
             merged: Vec::new(),
         }
+    }
+
+    pub fn involves_void(&self, state: &mut State<'_>) -> Result<bool> {
+        self.ty.involves_void(state)
     }
 
     /// Setup some uninit memory for this param.
@@ -486,7 +131,7 @@ impl Param {
             _ => {
                 swwriteln!(
                     state,
-                    "let mut {} = mem::MaybeUninit::uninit();",
+                    "let mut {} = mem::MaybeUninit::zeroed();",
                     AsSnakeCase(self.name),
                 )?;
                 swwriteln!(
@@ -518,6 +163,8 @@ impl Param {
             expr,
         )?;
 
+        self.setup_input_merged_parameters(state)?;
+
         Ok(())
     }
 
@@ -534,18 +181,38 @@ impl Param {
                     FieldName(self.name),
                 )?;
             }
-            Type::Callback { fn_type, .. } => {
+            Type::Callback {
+                fn_type,
+                input_ptr_ty,
+                ..
+            } => {
+                // allow the function to be mutably borrowed if necessary
+                if let FnType::FnMut = fn_type {
+                    swwriteln!(state, "let mut {0} = {0};", FieldName(self.name))?;
+                }
+
+                let ptr_name = self.merged.first().unwrap();
+                swwrite!(state, "let {} = ", Sanitize(ptr_name))?;
+
+                match input_ptr_ty {
+                    PtrClass::Wparam => swwrite!(state, "unsafe {{ Wparam::from_ptr(")?,
+                    PtrClass::Lparam => swwrite!(state, "unsafe {{ Lparam::from_ptr(")?,
+                    _ => {}
+                }
+
                 // the actual function takes a pointer to the inner
                 // function and casts it to call it
-                let ptr_name = self.merged.first().unwrap();
                 match fn_type {
-                    FnType::FnMut => swwriteln!(
-                        state,
-                        "let {} = (&mut {}).as_ptr() as *mut _ as _;",
-                        Sanitize(ptr_name),
-                        FieldName(self.name),
-                    )?,
+                    FnType::FnMut => {
+                        swwrite!(state, "(&mut {}) as *mut _ as *mut _", FieldName(self.name),)?
+                    }
                 }
+
+                if let PtrClass::Wparam | PtrClass::Lparam = input_ptr_ty {
+                    swwrite!(state, ") }}")?;
+                }
+
+                swwriteln!(state, ";")?;
             }
             _ => {}
         }
@@ -590,7 +257,7 @@ impl Param {
                 for (i, param) in params
                     .iter()
                     .enumerate()
-                    .filter(|(_, p)| *p != &**input_ptr_ty)
+                    .filter(|(_, p)| p.ptr_class() != Some(*input_ptr_ty))
                 {
                     let ip = param.param_position(true, state)?;
                     genbound.push_str(&ip);
@@ -615,21 +282,121 @@ impl Param {
 }
 
 /// Merge various parameters together.
-/// 
+///
 /// This algorithm merges refs and their associated lengths to create
 /// slices, and functions with pointers to make callbacks.
 fn merge_params(
-    params: &mut Vec<Param>,
+    params: &mut [Param],
+    merged_params: &mut Vec<usize>,
     state: &mut State<'_>,
 ) -> Result<()> {
+    enum MergeInfo {
+        MakeSlice,
+        MakeCallback { input_ptr_ty: PtrClass },
+    }
+
     // try to find a param to be merged
-    while let Some((index, param, merge_index)) =
-        params.iter().enumerate().rev().find_map(|(_, param)| {
+    while let Some((index, param, merge_index, merge_info)) = params
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !merged_params.contains(i))
+        .rev()
+        .find_map(|(index, param)| {
+            let mut mergable_params = params
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !merged_params.contains(i))
+                .filter(|(_, p)| !fits_globs(p.name, &state.dont_merge_globs));
+
             match &param.ty {
+                Type::Ref(ty) => {
+                    // string references are never merged
+                    if ty.is_str_ref() || ty.is_os_str_ref() {
+                        return None;
+                    }
+
+                    // look for a potential size for this value, it might be a slice
+                    mergable_params
+                        .rfind(|(_, param)| {
+                            likely_slice_count(param.name)
+                                && matches!(param.ty, Type::Primitive("i32" | "u32"))
+                        })
+                        .map(move |(size_index, _)| {
+                            (index, param, size_index, MergeInfo::MakeSlice)
+                        })
+                }
+                Type::Item(item) => match &**item {
+                    Item::FunctionType {
+                        name,
+                        params: func_params,
+                        return_type,
+                    } => {
+                        // look for a pointer type that is:
+                        // - a: one of *const void, lparam or wparam
+                        // - b: also in the params list
+                        mergable_params.rev().find_map(|(merge_index, tparam)| {
+                            let ptr_class = tparam.ty.ptr_class()?;
+
+                            if func_params
+                                .iter()
+                                .filter_map(|p| p.ty.ptr_class())
+                                .any(|p| p == ptr_class)
+                            {
+                                Some((
+                                    index,
+                                    param,
+                                    merge_index,
+                                    MergeInfo::MakeCallback {
+                                        input_ptr_ty: ptr_class,
+                                    },
+                                ))
+                            } else {
+                                None
+                            }
+                        })
+                    }
+                    _ => None,
+                },
                 _ => None,
             }
-        }) {
-        
+        })
+    {
+        let p1name = param.name;
+        let p2name = params[merge_index].name;
+        tracing::info!("Merging together parameters {} and {}", p1name, p2name);
+
+        // update the parameter's type
+        match merge_info {
+            MergeInfo::MakeSlice => take(&mut params[index].ty, |ty| match ty {
+                Type::Ref(ty) => Type::Slice(ty),
+                _ => unreachable!(),
+            }),
+            MergeInfo::MakeCallback { input_ptr_ty } => {
+                take(&mut params[index].ty, |ty| match ty {
+                    Type::Item(it) => match &*it {
+                        Item::FunctionType {
+                            name,
+                            params,
+                            return_type,
+                        } => Type::Callback {
+                            name: name.to_string(),
+                            params: params.iter().map(|p| p.ty.clone()).collect(),
+                            ret_ty: return_type.clone().map(Box::new),
+                            input_ptr_ty,
+                            fn_type: FnType::FnMut,
+                        },
+                        _ => unreachable!(),
+                    },
+                    _ => unreachable!(),
+                })
+            }
+        }
+
+        // add the second parameter to the first's merge list
+        params[index].merged.push(p2name);
+
+        // delete the second parameter
+        merged_params.push(merge_index);
     }
 
     Ok(())
@@ -655,16 +422,49 @@ impl From<ParamFlags> for Variation {
 }
 
 impl Function {
+    pub fn merge_params(&mut self, state: &mut State<'_>) -> Result<()> {
+        let span = tracing::info_span!(
+            "merge_params",
+            function = %self.name
+        );
+        let _enter = span.enter();
+        merge_params(&mut self.params, &mut self.merged_params, state)
+    }
+
+    fn unmerged_params(&self) -> impl DoubleEndedIterator<Item = (usize, &Param)> {
+        self.params
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !self.merged_params.contains(i))
+    }
+
+    fn involves_void(&self, state: &mut State<'_>) -> Result<bool> {
+        let ret_ty = self
+            .return_type
+            .as_ref()
+            .map_or(Ok(false), |ret_ty| ret_ty.involves_void(state))?;
+        self.params
+            .iter()
+            .map(|p| p.involves_void(state))
+            .try_fold(ret_ty, |acc, p| Ok(acc || p?))
+    }
+
     pub fn write(&self, state: &mut State<'_>) -> Result<()> {
+        // comment it out if it involves void
+        let involves_void = self.involves_void(state)?;
+        if involves_void {
+            state.begin_comment();
+            swwriteln!(state, "Not generated due to containing a void type")?;
+        }
+
         swwriteln!(state, "#[inline]")?;
         swwrite!(state, "pub fn {}", AsSnakeCase(self.name),)?;
 
         // write generics if we have to
         let mut need_closing_bracket = false;
         let generics = self
-            .params
-            .iter()
-            .filter_map(|p| p.generics(state).transpose())
+            .unmerged_params()
+            .filter_map(|(_, p)| p.generics(state).transpose())
             .collect::<Result<Vec<_>>>()?;
         for (i, generic) in generics.into_iter().enumerate() {
             need_closing_bracket = true;
@@ -681,7 +481,7 @@ impl Function {
         swwrite!(state, "(")?;
 
         // write each input parameter
-        for (i, param) in self.params.iter().enumerate() {
+        for (i, param) in self.unmerged_params() {
             if matches!(param.variation, Variation::Output | Variation::NotUsed) {
                 continue;
             }
@@ -693,13 +493,15 @@ impl Function {
 
             let pp = ty.param_position(false, state)?;
             let is_optional = param.optional;
+            let is_function = ty.is_function();
+            let emit_option_tag = is_optional && !is_function;
             swwrite!(
                 state,
                 "{}: {}{}{}",
                 FieldName(&param.name),
-                if is_optional { "Option<" } else { "" },
+                if emit_option_tag { "Option<" } else { "" },
                 pp,
-                if is_optional { ">" } else { "" },
+                if emit_option_tag { ">" } else { "" },
             )?;
 
             if i != self.params.len() - 1 {
@@ -724,7 +526,7 @@ impl Function {
             .return_type
             .iter()
             .map(anyhow::Ok)
-            .chain(self.params.iter().filter_map(|param| {
+            .chain(self.unmerged_params().filter_map(|(_, param)| {
                 if matches!(param.variation, Variation::Output | Variation::InOut) {
                     Some(param.ty.unwrap_mut_ref())
                 } else {
@@ -760,37 +562,33 @@ impl Function {
         swwriteln!(state, " {{")?;
 
         // function body
-        // TODO
         state.indent(|state| {
             // set up unused params
             // since they're unused we can just make them uninit
-            for param in self
-                .params
-                .iter()
-                .filter(|p| matches!(p.variation, Variation::NotUsed))
+            for (_, param) in self
+                .unmerged_params()
+                .filter(|(_, p)| matches!(p.variation, Variation::NotUsed))
             {
                 swwriteln!(
                     state,
-                    "let {} = unsafe {{ mem::uninitialized() }};",
+                    "let {} = unsafe {{ mem::zeroed() }};",
                     param.name
                 )?;
             }
 
             // set up output params
             // make them uninit so we can output into them
-            for param in self
-                .params
-                .iter()
-                .filter(|p| matches!(p.variation, Variation::Output))
+            for (_, param) in self
+                .unmerged_params()
+                .filter(|(_, p)| matches!(p.variation, Variation::Output))
             {
                 param.setup_uninit_memory(&self.params, state)?;
             }
 
             // set up input/inout params
-            for param in self
-                .params
-                .iter()
-                .filter(|p| matches!(p.variation, Variation::Input | Variation::InOut))
+            for (_, param) in self
+                .unmerged_params()
+                .filter(|(_, p)| matches!(p.variation, Variation::Input | Variation::InOut))
             {
                 param.setup_input(state)?;
             }
@@ -828,11 +626,10 @@ impl Function {
             }
 
             // parse returned parameters
-            for param in self
-                .params
-                .iter()
+            for (_, param) in self
+                .unmerged_params()
                 .rev()
-                .filter(|p| matches!(p.variation, Variation::Output | Variation::InOut))
+                .filter(|(_, p)| matches!(p.variation, Variation::Output | Variation::InOut))
             {
                 param.parse_returned_value(&self.params, state)?;
             }
@@ -886,10 +683,11 @@ impl Function {
 
                     // remainder of return values
                     let output_names = self
-                        .params
-                        .iter()
-                        .filter(|p| matches!(p.variation, Variation::InOut | Variation::Output))
-                        .map(|p| p.name)
+                        .unmerged_params()
+                        .filter(|(_, p)| {
+                            matches!(p.variation, Variation::InOut | Variation::Output)
+                        })
+                        .map(|(_, p)| p.name)
                         .collect::<Vec<_>>();
                     for (i, name) in output_names.iter().enumerate() {
                         swwrite!(state, "{}", name)?;
@@ -912,6 +710,10 @@ impl Function {
         })?;
 
         swwriteln!(state, "}}")?;
+
+        if involves_void {
+            state.end_comment();
+        }
 
         Ok(())
     }
@@ -999,16 +801,18 @@ impl<T: AsRef<str>> fmt::Display for FieldName<T> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FnType {
     FnMut,
 }
 
 fn likely_slice_count(name: &str) -> bool {
-    name.starts_with('n')
-        || name.contains("max")
+    name.contains("max")
         || name.starts_with('c')
+        || name.starts_with('n')
         || name.contains("cch")
+        || name.ends_with("Size")
         || name.ends_with("size")
+        || name.ends_with("Count")
         || name.ends_with("count")
 }

@@ -196,6 +196,21 @@ impl<Tag> Hgdiobj<Tag> {
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
+pub struct Hglrc <Tag = YawwTag> {
+    inner: Object<safer_wingui::Hglrc, Tag>,
+}
+
+impl<Tag> Hglrc<Tag> {
+    pub(crate) fn new(inner: Object<safer_wingui::Hglrc, Tag>) -> Self {
+        Self {
+            inner,
+        }
+    }
+}
+                    
+
+#[repr(transparent)]
+#[derive(Copy, Clone)]
 pub struct Hhook <Tag = YawwTag> {
     inner: Object<safer_wingui::Hhook, Tag>,
 }
@@ -472,21 +487,6 @@ pub struct HdcMetdataFileHandle <Tag = YawwTag> {
 
 impl<Tag> HdcMetdataFileHandle<Tag> {
     pub(crate) fn new(inner: Object<safer_wingui::HdcMetdataFileHandle, Tag>) -> Self {
-        Self {
-            inner,
-        }
-    }
-}
-                    
-
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct Lparam <Tag = YawwTag> {
-    inner: Object<safer_wingui::Lparam, Tag>,
-}
-
-impl<Tag> Lparam<Tag> {
-    pub(crate) fn new(inner: Object<safer_wingui::Lparam, Tag>) -> Self {
         Self {
             inner,
         }

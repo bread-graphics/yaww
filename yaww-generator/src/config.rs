@@ -12,4 +12,5 @@ pub struct Directives<'a> {
     pub modules: Vec<Cow<'a, str>>,
     pub ignore: Vec<Cow<'a, str>>,
     pub actual_bools: Vec<Cow<'a, str>>,
+    pub dont_merge: Vec<Cow<'a, str>>,
 }
