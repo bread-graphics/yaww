@@ -99,6 +99,22 @@ ignore = [
     "NMB*",
     "gl*",
     "EnumMetaFile",
+    "TV*",
+    "GetOutlineTextMetrics*",
+    "HMONITOR_User*arshal*",
+    "GetBufferedPaintBits",
+    "UnregisterApp*",
+    "Shell_NotifyIcon*",
+    "CommandLine*",
+    "GCP_*",
+    "AXESLIST*",
+    "AXISINFO*",
+    "CATEGORY_*",
+    "*CCSTYLE*",
+    "CCCOLUMN*",
+    "CMCOLUMN*",
+    "DESKBAND*",
+    "CREDENTIAL_*",
 ]
 actual_bools = [
     "*_visible*",
@@ -113,4 +129,8 @@ dont_merge = [
     "c*Desired",
     "nIDEvent",
     "cWidth",
+    "cchMax*Name",
+]
+stub_struct = [
+    "DEVMODE*",
 ]

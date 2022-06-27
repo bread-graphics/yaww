@@ -496,21 +496,6 @@ impl<Tag> HdcMetdataFileHandle<Tag> {
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub struct Lresult <Tag = YawwTag> {
-    inner: Object<safer_wingui::Lresult, Tag>,
-}
-
-impl<Tag> Lresult<Tag> {
-    pub(crate) fn new(inner: Object<safer_wingui::Lresult, Tag>) -> Self {
-        Self {
-            inner,
-        }
-    }
-}
-                    
-
-#[repr(transparent)]
-#[derive(Copy, Clone)]
 pub struct ShandlePtr <Tag = YawwTag> {
     inner: Object<safer_wingui::ShandlePtr, Tag>,
 }

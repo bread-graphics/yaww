@@ -89,4 +89,5 @@ macro_rules! base_impl {
 }
 
 base_impl! { Wparam, IntoWparam, usize }
-base_impl! { Lparam, IntoWParam, isize }
+base_impl! { Lparam, IntoLParam, isize }
+base_impl! { Lresult, IntoLresult, isize }

@@ -1,7 +1,7 @@
 // MIT/Apache2 License
 
 use super::{format_namespace, Constant, Field, FieldName, Param, Sanitize, Special, Type};
-use crate::State;
+use crate::{State, any_res, all_res};
 use anyhow::{anyhow, Result};
 use heck::{
     AsLowerCamelCase, AsShoutySnakeCase, AsSnakeCase, AsUpperCamelCase, ToSnakeCase,
@@ -44,24 +44,24 @@ pub enum Item {
 }
 
 fn struct_varsize(fields: &[Field], state: &mut State<'_>) -> Result<bool> {
-    fields.iter().map(|field| {
+    any_res(fields.iter().map(|field| {
         let ty = field.ty(state)?;
-        anyhow::Ok(ty.involves_varsized())
-    }).try_fold(false, |acc, b| Ok(acc || b?))
+        Ok(ty.involves_varsized())
+    }))
 } 
 
 fn struct_impl_block(
     name: &str,
     fields: &[Field],
     is_union: bool,
+    needs_lifetime: bool,
     namespace: &str,
     state: &mut State<'_>,
 ) -> Result<()> {
     // whether or not all fields are thin
-    let mut is_thin = fields
+    let mut is_thin = all_res(fields
         .iter()
-        .map(|f| f.ty(state)?.thin(state))
-        .try_fold(true, |acc, b| anyhow::Ok(acc && b?))?;
+        .map(|f| f.ty(state)?.thin(state)))?;
     let is_varsize = struct_varsize(fields, state)?;
 
     // we aren't this if the last field is a size
@@ -74,7 +74,11 @@ fn struct_impl_block(
     let namespace = format_namespace(namespace);
     let win32_name = format!("{}::{}", namespace, name);
 
-    swwriteln!(state, "impl {} {{", &display_name)?;
+    if needs_lifetime {
+        swwriteln!(state, "impl<'a> {}<'a> {{", &display_name)?;
+    } else {
+        swwriteln!(state, "impl {} {{", &display_name)?;
+    }
     state.indent(|state| {
         // method to convert to win32
         swwriteln!(state, "fn to_win32(&self) -> {} {{", &win32_name)?;
@@ -183,8 +187,7 @@ impl Item {
             Self::ConstantSet { name, .. } => (*name).into(),
             Self::Structure { name, .. } => name.clone(),
             Self::Interface => "interface".into(),
-            Self::Special(Special::Wparam) => "Wparam".into(),
-            Self::Special(Special::Lparam) => "Lparam".into(),
+            Self::Special(s) => s.name().into(),
         }
     }
 
@@ -208,25 +211,26 @@ impl Item {
 
                 let is_union = *is_union;
                 // don't write if we contain an interface
-                if fields.iter().try_fold(false, |acc, f| {
-                    anyhow::Ok(acc || f.ty(state)?.is_interface())
-                })? {
+                if any_res(fields.iter().map(|f| anyhow::Ok(f.ty(state)?.is_interface())))? {
                     return Ok(());
                 }
 
-                let involves_void = fields
+                let involves_void = any_res(fields
                     .iter()
-                    .map(|f| f.involves_void(state))
-                    .try_fold(false, |acc, b| anyhow::Ok(acc || b?))?;
+                    .map(|f| f.involves_void(state)))?;
+                let involves_stub = any_res(fields.iter().map(|f| f.ty(state)?.involves_stub(state)))?;
                 if involves_void {
                     state.begin_comment();
                     swwriteln!(state, "Not generated due to containing a void type")?;
+                } else if involves_stub {
+                    state.begin_comment();
+                    swwriteln!(state, "Not generated because it involves stubs, crate should manually define type")?;
                 }
 
                 if !is_union {
                     swwriteln!(
                         state,
-                        "#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+                        "#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]"
                     )?;
                 }
 
@@ -244,19 +248,22 @@ impl Item {
                 }
                 swwrite!(state, "{}", AsUpperCamelCase(name))?;
 
-                if fields.iter().try_fold(false, |acc, f| {
-                    anyhow::Ok(acc || f.ty(state)?.needs_lifetime(state)?)
-                })? {
+                let needs_lifetime = any_res(fields.iter().map(|f| f.ty(state)?.needs_lifetime(state)))?;
+                if needs_lifetime {
                     swwrite!(state, "<'a>")?;
                 }
                 swwriteln!(state, " {{")?;
 
                 // write all of the fields
                 state.indent(|state| {
-                    for field in fields {
-                        let ty = field.ty(state)?;
-                        let fp = ty.field_position(state)?;
-                        swwriteln!(state, "pub {}: {},", FieldName(&field.name), fp)?;
+                    if involves_stub {
+                        swwriteln!(state, "STUBBED OUT")?;
+                    } else {
+                        for field in fields {
+                            let ty = field.ty(state)?;
+                            let fp = ty.field_position(state)?;
+                            swwriteln!(state, "pub {}: {},", FieldName(&field.name), fp)?;
+                        }
                     }
 
                     anyhow::Ok(())
@@ -265,9 +272,11 @@ impl Item {
                 swwriteln!(state, "}}")?;
 
                 // write the impl block
-                struct_impl_block(name, fields, is_union, namespace, state)?;
+                if !involves_stub {
+                    struct_impl_block(name, fields, is_union, needs_lifetime, namespace, state)?;
+                }
 
-                if involves_void {
+                if involves_void || involves_stub {
                     state.end_comment();
                 }
             }
@@ -277,6 +286,11 @@ impl Item {
                 ty,
             } => {
                 for constant in constants {
+                    // skip if we've already emittted it
+                    if state.constants_emitted.insert(constant.name) {
+                        continue;
+                    }
+
                     // write the constant line
                     swwriteln!(
                         state,
@@ -306,13 +320,14 @@ impl {0} {{
         }}
     }}
 
-    pub const unsafe fn new_optional(handle: isize) -> Self {{
-        NonZeroIsize::new(handle).map(|handle| {{
-            Self {{
+    pub const unsafe fn new_optional(handle: isize) -> Option<Self> {{
+        match NonZeroIsize::new(handle) {{
+            Some(handle) => Some(Self {{
                 handle,
                 _thread_unsafe: PhantomData,
-            }}
-        }})
+            }}),
+            None => None,
+        }}
     }}
 
     pub fn into_raw(self) -> isize {{

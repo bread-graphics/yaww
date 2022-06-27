@@ -1,7 +1,7 @@
 // MIT/Apache2 License
 
-use super::{function_type, likely_slice_count, FnType, Item, Param, Special, Variation};
-use crate::State;
+use super::{function_type, likely_slice_count, FnType, Item, Param, Special, Variation, any_res, all_res};
+use crate::{State, format_namespace};
 use anyhow::{anyhow, Result};
 use heck::{
     AsLowerCamelCase, AsShoutySnakeCase, AsSnakeCase, AsUpperCamelCase, ToSnakeCase,
@@ -16,6 +16,8 @@ use std::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Void,
+    /// Stubbed out to be implemented in the crate body.
+    Stub,
     /// A primitive type, like `u32` or `bool`.
     Primitive(&'static str),
     /// Something like a string.
@@ -70,33 +72,49 @@ impl Type {
         }
     }
 
-    pub fn involves_void(&self, state: &mut State<'_>) -> Result<bool> {
-        Ok(match self {
-            Self::Void => true,
+    fn any_match_in_tree<F: FnMut(&Self) -> bool>(
+        &self,
+        state: &mut State<'_>,
+        mut tester: F
+    ) -> Result<bool> {
+        if tester(self) {
+            return Ok(true);
+        }
+
+        match self {
             Self::Ref(ty) | Self::MutRef(ty) | Self::Slice(ty) | Self::Array(ty, _) => {
-                ty.involves_void(state)?
+                ty.any_match_in_tree(state, tester)
             }
             Self::Callback { params, ret_ty, .. } => {
+                // prevent more than one level of type recursion
+                let mut dyn_tester: &mut dyn FnMut(&Self) -> bool = &mut tester;
                 let rt = ret_ty
                     .as_ref()
-                    .map_or(Ok(false), |ret_ty| ret_ty.involves_void(state))?;
-                params
+                    .map_or(Ok(false), |ret_ty| ret_ty.any_match_in_tree(state, &mut dyn_tester))?;
+                any_res(params
                     .iter()
-                    .map(|ty| ty.involves_void(state))
-                    .try_fold(rt, |acc, b| anyhow::Ok(acc || b?))?
+                    .map(|ty| ty.any_match_in_tree(state, &mut dyn_tester)).chain(Some(Ok(rt))))
             }
             Self::Item(item) => {
                 if let Item::Structure { fields, .. } = &**item {
-                    fields
+                    let mut dyn_tester: &mut dyn FnMut(&Self) -> bool = &mut tester;
+                    any_res(fields
                         .iter()
-                        .map(|field| field.involves_void(state))
-                        .try_fold(false, |acc, b| anyhow::Ok(acc || b?))?
+                        .map(|field| field.ty(state)?.any_match_in_tree(state, &mut dyn_tester)))
                 } else {
-                    false
+                    Ok(false)
                 }
             }
-            _ => false,
-        })
+            _ => Ok(false),
+        }
+    }
+
+    pub fn involves_stub(&self, state: &mut State<'_>) -> Result<bool> {
+        self.any_match_in_tree(state, |t| matches!(t, Self::Stub))
+    }
+
+    pub fn involves_void(&self, state: &mut State<'_>) -> Result<bool> {
+        self.any_match_in_tree(state, |t| matches!(t, Self::Void))
     }
 
     /// In the constant position.
@@ -125,9 +143,7 @@ impl Type {
         Ok(match self {
             Self::Ref(_) | Self::MutRef(_) | Self::String | Self::OsString | Self::Slice(_) => true,
             Self::Item(item) => match &**item {
-                Item::Structure { fields, .. } => fields.iter().try_fold(false, |acc, f| {
-                    anyhow::Ok(acc || f.ty(state)?.needs_lifetime(state)?)
-                })?,
+                Item::Structure { fields, .. } => any_res(fields.iter().map(|f| f.ty(state)?.needs_lifetime(state)))?,
                 _ => false,
             },
             _ => false,
@@ -167,8 +183,7 @@ impl Type {
                     return_type,
                     ..
                 } => function_type(params, return_type.as_ref(), state)?,
-                Item::Special(Special::Wparam) => "Wparam".to_string(),
-                Item::Special(Special::Lparam) => "Lparam".to_string(),
+                Item::Special(s) => s.name().to_string(),
                 Item::Interface => return Err(anyhow!("interface invalid in field position")),
             },
             Self::Array(ty, size) => format!("[{}; {}]", ty.field_position(state)?, size),
@@ -178,6 +193,7 @@ impl Type {
                 // this turns this structure into a real variable-size type
                 format!("[{}]", ty.field_position(state)?)
             }
+            Self::Stub => "STUBBED".to_string(),
             _ => unreachable!(),
         })
     }
@@ -205,8 +221,7 @@ impl Type {
                 } => function_type(params, return_type.as_ref(), state)?,
                 Item::ForeignHandle(name) => name.to_upper_camel_case(),
                 Item::Interface => return Err(anyhow!("interface invalid in param position")),
-                Item::Special(Special::Wparam) => "Wparam".to_string(),
-                Item::Special(Special::Lparam) => "Lparam".to_string(),
+                Item::Special(s) => s.name().to_string(),
                 Item::Structure { name, .. } => {
                     if self.needs_lifetime(state)? {
                         format!("{}<'_>", AsUpperCamelCase(name))
@@ -251,9 +266,8 @@ impl Type {
                     return_type,
                     ..
                 } => function_type(params, return_type.as_ref(), state)?,
-                Item::Special(Special::Lparam) => "LPARAM".to_string(),
-                Item::Special(Special::Wparam) => "WPARAM".to_string(),
-                Item::Structure { name, .. } => name.to_string(),
+                Item::Special(s) => s.win32_name().to_string(),
+                Item::Structure { name, namespace, .. } => format!("{}::{}", format_namespace(namespace), name),
                 Item::Interface => unreachable!(),
             },
             ty => return Err(anyhow!("Invalid type in Win32 param position: {:?}", ty)),
@@ -282,13 +296,12 @@ impl Type {
                 } => function_type(params, return_type.as_ref(), state)?,
                 Item::Structure { name, .. } => {
                     if self.needs_lifetime(state)? {
-                        format!("{}<'_>", AsUpperCamelCase(name))
+                        format!("{}<'static>", AsUpperCamelCase(name))
                     } else {
                         name.to_upper_camel_case()
                     }
                 }
-                Item::Special(Special::Lparam) => "Lparam".into(),
-                Item::Special(Special::Wparam) => "Wparam".into(),
+                Item::Special(s) => s.name().to_string(),
                 Item::Interface => return Err(anyhow!("Interface is invalid in return position")),
             },
             Self::Callback { .. } => return Err(anyhow!("callback invalid in return position")),
@@ -334,13 +347,13 @@ impl Type {
                     let first_field_is_size =
                         first_field_name.ends_with("Size") || first_field_name.ends_with("size");
 
-                    fields
+                    !first_field_is_size && 
+                    all_res(fields
                         .iter()
                         .map(|f| {
                             let ty = f.ty(state)?;
                             ty.thin(state)
-                        })
-                        .try_fold(!first_field_is_size, |acc, t| anyhow::Ok(acc && t?))?
+                        }))?
                 }
                 Item::Interface => return Err(anyhow!("interface invalid in thin")),
             },
@@ -503,7 +516,7 @@ impl Type {
                 // calls it
                 let fname = format!("{}_impl", AsSnakeCase(name),);
                 let generic_name = name.to_upper_camel_case();
-                swwrite!(state, r#"unsafe extern "system" fn {}("#, &fname,)?;
+                swwrite!(state, r#"unsafe extern "system" fn {}<{}>("#, &fname, &generic_name)?;
                 for (i, param) in params.iter().enumerate() {
                     let pp = param.win32_param_position(state)?;
                     swwrite!(state, "param{}: {}", i, pp)?;
@@ -604,7 +617,7 @@ impl Type {
                 })?;
                 swwriteln!(state, "}}")?;
 
-                Ok(format!("Some({})", fname))
+                Ok(format!("Some({}::<{}>)", fname, &generic_name))
             }
             ty => return Err(anyhow!("Invalid type in input position: {:?}", ty)),
         }
@@ -708,7 +721,7 @@ impl Type {
                             name
                         ))
                     }
-                    Self::OsString => Ok(format!("OsStringExt::from_wide({})", name)),
+                    Self::OsString => Ok(format!("OsString::from_wide(&{})", name)),
                     _ => unreachable!(),
                 }
             }
@@ -722,10 +735,7 @@ impl Type {
                 )),
                 Item::FunctionType { .. } => Ok(format!("Some({})", input)),
                 Item::Special(s) => {
-                    let class_name = match s {
-                        Special::Lparam => "Lparam",
-                        Special::Wparam => "Wparam",
-                    };
+                    let class_name = s.name();
 
                     Ok(format!(
                         "unsafe {{ {}::from_inner({}) }}",
@@ -755,9 +765,9 @@ impl Type {
                 // convert from string
                 if ty.is_os_str_ref() {
                     // ensure last bit is zero
-                    swwriteln!(state, "assert_eq!({}.last(), Some(0));", fname,)?;
+                    swwriteln!(state, "assert_eq!({}.last().copied(), Some(0));", fname,)?;
                 }
-                format!("{}.as_ptr()", fname)
+                format!("{}.as_ptr() as _", fname)
             }
             Type::Ref(ty) => {
                 if !ty.thin(state)? {
@@ -778,7 +788,16 @@ impl Type {
                 let size = *size;
 
                 for i in 0..size {
-                    let input_expr = format!("{}[{}]", fname, i);
+                    let input_expr = format!(
+                        "{}{}[{}]", 
+                        if matches!(&**ty, Type::Primitive(_)) {
+                            "&"
+                        } else {
+                            ""
+                        },
+                        fname, 
+                        i
+                    );
                     write!(expr, "{}", ty.to_win32(&input_expr, state)?).ok();
 
                     if i != size - 1 {
@@ -792,7 +811,7 @@ impl Type {
             }
             Type::Void => "todo_void".to_string(),
             Type::Item(item) => match &**item {
-                Item::AlreadyImported(_) | Item::ConstantSet { .. } => fname.to_string(),
+                Item::AlreadyImported(_) | Item::ConstantSet { .. } => format!("*{}", fname),
                 Item::ForeignHandle(class_name) => {
                     format!(
                         "{}.map_or(0, {}::into_raw)",
@@ -800,7 +819,7 @@ impl Type {
                         AsUpperCamelCase(class_name)
                     )
                 }
-                Item::FunctionType { .. } => format!("Some({})", fname),
+                Item::FunctionType { .. } => format!("*{}", fname),
                 Item::Special(_) => format!("{}.into_inner()", fname),
                 Item::Structure { .. } => format!("{}.to_win32()", fname),
                 Item::Interface => return Err(anyhow!("interface invalid in to_win32")),
@@ -817,7 +836,7 @@ impl Type {
             Type::Primitive(_) => fname.to_string(),
             ty if ty.is_str_ref() => {
                 // convert from string
-                swwriteln!(state, "let {0} = unsafe {{ CStr::from_ptr({0}) }};", fname,)?;
+                swwriteln!(state, "let {0} = unsafe {{ CStr::from_ptr({0} as *const _) }};", fname,)?;
                 swwriteln!(state, "let {0} = {0}.to_bytes_with_nul().to_vec();", fname,)?;
 
                 format!(
@@ -838,7 +857,7 @@ impl Type {
                     fname,
                 )?;
 
-                format!("{}.to_vec()", fname)
+                format!("Cow::Owned({}.to_vec())", fname)
             }
             Type::Ref(ty) => {
                 if !ty.thin(state)? {
@@ -882,15 +901,12 @@ impl Type {
                 }
                 Item::FunctionType { .. } => fname.to_string(),
                 Item::Special(s) => {
-                    let class_name = match s {
-                        Special::Lparam => "Lparam",
-                        Special::Wparam => "Wparam",
-                    };
+                    let class_name = s.name();
 
                     format!("unsafe {{ {}::from_inner({}) }}", class_name, fname)
                 }
-                Item::Structure { name, .. } => {
-                    format!("unsafe {{ {}::from_win32({}) }}", name, fname)
+                Item::Structure { name, namespace, .. } => {
+                    format!("unsafe {{ {}::from_win32({}) }}", AsUpperCamelCase(name), fname)
                 }
                 Item::Interface => return Err(anyhow!("interface invalid in from_win32")),
             },

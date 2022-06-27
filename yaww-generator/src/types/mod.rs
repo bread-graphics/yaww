@@ -1,6 +1,6 @@
 // MIT/Apache2 License
 
-use crate::{fits_globs, swwriteln, types::ty::PtrClass, State};
+use crate::{fits_globs, swwriteln, types::ty::PtrClass, State, any_res, all_res};
 use anyhow::{anyhow, Context, Result};
 use heck::{AsSnakeCase, AsUpperCamelCase};
 use std::{
@@ -23,6 +23,25 @@ pub use ty::Type;
 pub enum Special {
     Wparam,
     Lparam,
+    Lresult,
+}
+
+impl Special {
+    pub fn win32_name(&self) -> &'static str {
+        match self {
+            Special::Wparam => "WPARAM",
+            Special::Lparam => "LPARAM",
+            Special::Lresult => "LRESULT",
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Special::Wparam => "Wparam",
+            Special::Lparam => "Lparam",
+            Special::Lresult => "Lresult",
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -443,10 +462,9 @@ impl Function {
             .return_type
             .as_ref()
             .map_or(Ok(false), |ret_ty| ret_ty.involves_void(state))?;
-        self.params
+        any_res(self.params
             .iter()
-            .map(|p| p.involves_void(state))
-            .try_fold(ret_ty, |acc, p| Ok(acc || p?))
+            .map(|p| p.involves_void(state)).chain(Some(Ok(ret_ty))))
     }
 
     pub fn write(&self, state: &mut State<'_>) -> Result<()> {
@@ -625,6 +643,16 @@ impl Function {
                 swwriteln!(state, "}}")?;
             }
 
+            // make returned finalize
+            if let Some(ty) = self.return_type.as_ref() {
+                let rty = ty.returnable_expr("return_value", &self.params, state)?;
+                swwriteln!(
+                    state,
+                    "let real_return_value = {};",
+                    rty 
+                )?;
+            }
+
             // parse returned parameters
             for (_, param) in self
                 .unmerged_params()
@@ -659,7 +687,7 @@ impl Function {
                                 ))
                                 .map(|p| p.name)
                                 .next()
-                                .unwrap_or("return_value")
+                                .unwrap_or("real_return_value")
                         )
                     )?;
 
@@ -678,7 +706,7 @@ impl Function {
 
                     // return type firsties
                     if self.return_type.is_some() {
-                        swwrite!(state, "return_value,")?;
+                        swwrite!(state, "real_return_value,")?;
                     }
 
                     // remainder of return values
