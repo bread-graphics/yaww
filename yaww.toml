@@ -63,6 +63,8 @@ ignore = [
     "SHDE*",
     "SORT*",
     "SHUn*",
+    "SHUp*",
+    "SHVa*",
     "SYNCMGR*",
     "WINDOWDATA",
     "Reg*Key*",
@@ -115,6 +117,8 @@ ignore = [
     "CMCOLUMN*",
     "DESKBAND*",
     "CREDENTIAL_*",
+    "ENUMUILANG",
+    "DoEnvironment*",
 ]
 actual_bools = [
     "*_visible*",
@@ -134,3 +138,14 @@ dont_merge = [
 stub_struct = [
     "DEVMODE*",
 ]
+
+[real_arr_type]
+CM_COLUMNINFO = { fname = "wszName", real_ty = "u16" }
+DISPLAY_DEVICEW = { fname = "Device*", real_ty = "u16" }
+DROPDESCRIPTION = { fname = "sz*", real_ty = "u16" }
+ENUMLOGFONTW = { fname = "elf*", real_ty = "u16" }
+ENUMLOGFONTEXW = { fname = "elf*", real_ty = "u16" }
+EXTLOGFONTW = { fname = "elf*", real_ty = "u16" }
+FILEDESCRIPTORW = { fname = "cF*", real_ty = "u16" }
+LOGFONTW = { fname = "lf*", real_ty = "u16" }
+EXP_DARWIN_LINK = { fname = "szw*", real_ty = "u16" }

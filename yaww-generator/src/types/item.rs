@@ -1,7 +1,7 @@
 // MIT/Apache2 License
 
 use super::{format_namespace, Constant, Field, FieldName, Param, Sanitize, Special, Type};
-use crate::{State, any_res, all_res};
+use crate::{State, any_res, all_res, Derives};
 use anyhow::{anyhow, Result};
 use heck::{
     AsLowerCamelCase, AsShoutySnakeCase, AsSnakeCase, AsUpperCamelCase, ToSnakeCase,
@@ -228,10 +228,12 @@ impl Item {
                 }
 
                 if !is_union {
-                    swwriteln!(
-                        state,
-                        "#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]"
-                    )?;
+                    // calculate and write the derives
+                    let derives = fields.iter().map(|field| {
+                        let ty = field.ty(state)?;
+                        Derives::of(ty, state)
+                    }).try_fold(Derives::default(), |acc, b| anyhow::Ok(acc * b?))?;
+                    derives.emit(state)?;
                 }
 
                 swwrite!(state, "#[repr(C")?;

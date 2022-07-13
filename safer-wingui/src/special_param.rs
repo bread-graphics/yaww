@@ -1,14 +1,36 @@
 // MIT/Apache2 License
 
-use core::marker::PhantomData;
+use core::{fmt, marker::PhantomData};
+
+struct HexWrapper(usize);
+
+impl fmt::Debug for HexWrapper {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "0x{:X}", self.0)
+    }
+}
 
 macro_rules! base_impl {
     ($name: ident, $into_name: ident, $inner: ident) => {
-        #[derive(Copy, Clone)]
+        #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
         #[repr(transparent)]
         pub struct $name {
             value: $inner,
             _thread_unsafe: PhantomData<*const ()>,
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::empty()
+            }
+        }
+
+        impl fmt::Debug for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_tuple(stringify!($name))
+                    .field(&HexWrapper(self.value as usize))
+                    .finish()
+            }
         }
 
         pub trait $into_name {
@@ -28,22 +50,22 @@ macro_rules! base_impl {
         }
 
         impl $name {
-            pub fn into_inner(self) -> $inner {
+            pub const fn into_inner(self) -> $inner {
                 self.value
             }
 
-            pub unsafe fn from_inner(inner: $inner) -> Self {
+            pub const unsafe fn from_inner(inner: $inner) -> Self {
                 Self {
                     value: inner,
                     _thread_unsafe: PhantomData,
                 }
             }
 
-            pub unsafe fn from_ptr(ptr: *mut ()) -> Self {
+            pub const unsafe fn from_ptr(ptr: *mut ()) -> Self {
                 Self::from_inner(ptr as $inner)
             }
 
-            pub fn empty() -> Self {
+            pub const fn empty() -> Self {
                 unsafe { Self::from_inner(0) }
             }
         }

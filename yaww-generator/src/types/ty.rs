@@ -8,6 +8,7 @@ use heck::{
     ToUpperCamelCase,
 };
 use std::{
+    borrow::Cow,
     fmt::Write,
     rc::Rc,
     sync::atomic::{AtomicUsize, Ordering::Relaxed},
@@ -19,7 +20,7 @@ pub enum Type {
     /// Stubbed out to be implemented in the crate body.
     Stub,
     /// A primitive type, like `u32` or `bool`.
-    Primitive(&'static str),
+    Primitive(Cow<'static , str>),
     /// Something like a string.
     String,
     /// Something like an `OsString`.
@@ -49,6 +50,10 @@ pub enum Type {
 }
 
 impl Type {
+    pub fn primitive(name: &'static str) -> Self {
+        Self::Primitive(Cow::Borrowed(name))
+    }
+
     pub fn is_str_ref(&self) -> bool {
         match self {
             Self::String => true,
@@ -118,7 +123,7 @@ impl Type {
     }
 
     /// In the constant position.
-    pub fn const_position(&self) -> Result<&'static str> {
+    pub fn const_position(&self) -> Result<&str> {
         match self {
             Self::Primitive(s) => Ok(s),
             Self::String => Ok("&str"),
@@ -129,6 +134,49 @@ impl Type {
             },
             ty => Err(anyhow!("type invalid in const position: {:?}", ty)),
         }
+    }
+
+    pub fn generics(&self, state: &mut State<'_>) -> Result<Option<String>> {
+         Ok(match &self {
+            Type::Callback {
+                name,
+                params,
+                fn_type,
+                input_ptr_ty,
+                ret_ty,
+            } => {
+                let mut genbound = format!(
+                    "{}: {}(",
+                    AsUpperCamelCase(name),
+                    match fn_type {
+                        FnType::FnMut => "FnMut",
+                    }
+                );
+
+                for (i, param) in params
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, p)| p.ptr_class() != Some(*input_ptr_ty))
+                {
+                    let ip = param.param_position(true, state)?;
+                    genbound.push_str(&ip);
+                    if i != params.len() - 1 {
+                        genbound.push_str(", ");
+                    }
+                }
+
+                genbound.push(')');
+
+                if let Some(ret_ty) = ret_ty {
+                    let rp = ret_ty.return_position(state)?;
+                    genbound.push_str(" -> ");
+                    genbound.push_str(&rp);
+                }
+
+                Some(genbound)
+            }
+            _ => None,
+        })       
     }
 
     pub fn unwrap_mut_ref(&self) -> Result<&Type> {
@@ -311,7 +359,7 @@ impl Type {
 
     pub fn is_fallible(&self, fnname: &str, state: &mut State<'_>) -> bool {
         match self {
-            Self::Primitive("i32") => true,
+            Self::Primitive(name) if name == "i32" => true,
             Self::Item(item) => match &**item {
                 Item::AlreadyImported("BOOL") => {
                     // if this is an actual boolean, then it's fallible
@@ -428,11 +476,9 @@ impl Type {
                     let ie = ty.input_expression(input_name, optional, state)?;
                     swwriteln!(state, "let {} = {};", &name, ie)?;
 
-                    Ok(if optional {
-                        format!("{}.as_ref()", name)
-                    } else {
+                    Ok(
                         format!("&{}", name)
-                    })
+                    )
                 }
             }
             Self::MutRef(ty) => {
@@ -587,7 +633,7 @@ impl Type {
                     swwriteln!(state, "}};")?;
 
                     // call the closure
-                    swwrite!(state, "let return_value = closure(")?;
+                    swwrite!(state, "let return_value = (closure)(")?;
 
                     for (i, _) in iter_params() {
                         swwrite!(state, "input{}", i,)?;
@@ -686,42 +732,18 @@ impl Type {
                     })
                     .unwrap_or("return_value");
 
-                let name = tempvar();
-
                 // read the string to a buffer
-                swwriteln!(state, "let {} = unsafe {{", &name,)?;
-                state.indent(|state| {
-                    swwriteln!(
-                        state,
-                        "slice::from_raw_parts({}, {} as usize)",
-                        input,
-                        AsSnakeCase(target_output),
-                    )
-                })?;
-                swwriteln!(state, "}};")?;
-
-                // convert to vec
-                swwriteln!(
-                    state,
-                    "let {0}{1} = {1}.to_vec();",
-                    if matches!(self, Type::String) {
-                        "mut "
-                    } else {
-                        ""
-                    },
-                    &name
-                )?;
+                swwriteln!(state, "{}.truncate({} as usize);", input, AsSnakeCase(target_output))?;
 
                 // convert to cstring or osstring
                 match self {
                     Self::String => {
-                        swwriteln!(state, "{}.push(0);", &name)?;
                         Ok(format!(
                             "unsafe {{ CString::from_vec_unchecked({}) }}",
-                            name
+                            input
                         ))
                     }
-                    Self::OsString => Ok(format!("OsString::from_wide(&{})", name)),
+                    Self::OsString => Ok(format!("OsString::from_wide(&{})", input)),
                     _ => unreachable!(),
                 }
             }
@@ -786,11 +808,16 @@ impl Type {
             Type::Array(ty, size) => {
                 let mut expr = "[".to_string();
                 let size = *size;
+                let needs_underef = match &**ty {
+                            Type::Primitive(_) => true,
+                            Type::Item(item) => matches!(&**item, Item::AlreadyImported(_)),
+                            _ => false,
+                        };
 
                 for i in 0..size {
                     let input_expr = format!(
                         "{}{}[{}]", 
-                        if matches!(&**ty, Type::Primitive(_)) {
+                        if needs_underef {
                             "&"
                         } else {
                             ""
@@ -916,7 +943,7 @@ impl Type {
 
     pub fn ptr_class(&self) -> Option<PtrClass> {
         match self {
-            Self::Primitive("usize") => Some(PtrClass::Usize),
+            Self::Primitive(prim) if prim == "usize" => Some(PtrClass::Usize),
             Self::Ref(ty) if matches!(&**ty, Self::Void) => Some(PtrClass::VoidPtr),
             Self::Item(it) => match &**it {
                 Item::Special(Special::Lparam) => Some(PtrClass::Lparam),

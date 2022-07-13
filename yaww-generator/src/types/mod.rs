@@ -10,6 +10,9 @@ use std::{
 use take_mut::take;
 use windows_metadata::reader::{self, ParamFlags};
 
+mod derives;
+pub use derives::Derives;
+
 mod structure;
 pub use structure::{Field, ResolveLater};
 
@@ -113,7 +116,7 @@ impl Param {
             Type::OsString | Type::String => {
                 // setup a buffer of the size given by the "n" or "max" parameter
                 for param in params.iter().rev() {
-                    if matches!(param.ty.unwrap_mut_ref()?, Type::Primitive("i32" | "u32"))
+                    if matches!(param.ty.unwrap_mut_ref()?, Type::Primitive(prim) if prim == "i32" || prim == "u32")
                         && (param.name.starts_with('n')
                             || param.name.contains("max")
                             || param.name.starts_with('c')
@@ -133,7 +136,7 @@ impl Param {
                         )?;
                         swwriteln!(
                             state,
-                            "let {} = {}.as_mut_ptr();",
+                            "let {}_win32 = {}.as_mut_ptr();",
                             self.name,
                             AsSnakeCase(self.name),
                         )?;
@@ -155,7 +158,7 @@ impl Param {
                 )?;
                 swwriteln!(
                     state,
-                    "let {} = {}.as_mut_ptr();",
+                    "let {}_win32 = {}.as_mut_ptr();",
                     self.name,
                     AsSnakeCase(self.name),
                 )?;
@@ -176,7 +179,7 @@ impl Param {
         let expr = ty.input_expression(&FieldName(&self.name).to_string(), self.optional, state)?;
         swwriteln!(
             state,
-            "let {}{} = {};",
+            "let {}{}_win32 = {};",
             if make_mutable { "mut " } else { "" },
             Sanitize(&self.name),
             expr,
@@ -195,7 +198,7 @@ impl Param {
                 let length_name = self.merged.first().unwrap();
                 swwriteln!(
                     state,
-                    "let {} = {}.len() as _;",
+                    "let {}_win32 = {}.len() as _;",
                     Sanitize(length_name),
                     FieldName(self.name),
                 )?;
@@ -211,7 +214,7 @@ impl Param {
                 }
 
                 let ptr_name = self.merged.first().unwrap();
-                swwrite!(state, "let {} = ", Sanitize(ptr_name))?;
+                swwrite!(state, "let {}_win32 = ", Sanitize(ptr_name))?;
 
                 match input_ptr_ty {
                     PtrClass::Wparam => swwrite!(state, "unsafe {{ Wparam::from_ptr(")?,
@@ -223,7 +226,10 @@ impl Param {
                 // function and casts it to call it
                 match fn_type {
                     FnType::FnMut => {
-                        swwrite!(state, "(&mut {}) as *mut _ as *mut _", FieldName(self.name),)?
+                        swwrite!(state, "(&mut {}) as *mut _ as *mut _", FieldName(self.name),)?;
+                        if let PtrClass::Usize = input_ptr_ty {
+                            swwrite!(state, " as usize")?;
+                        }
                     }
                 }
 
@@ -240,9 +246,12 @@ impl Param {
     }
 
     fn parse_returned_value(&self, params: &[Param], state: &mut State<'_>) -> Result<()> {
-        let input_expr = match self.variation {
-            Variation::InOut => Sanitize(&self.name).to_string(),
-            Variation::Output => format!("unsafe {{ {}.assume_init() }}", Sanitize(&self.name)),
+        let input_expr = match (&self.variation, &self.ty) {
+            (Variation::InOut, _) => Sanitize(&format!("{}_win32", self.name)).to_string(),
+            (Variation::Output, ty) if ty.is_str_ref() || ty.is_os_str_ref() => {
+                FieldName(self.name).to_string()
+            }
+            (Variation::Output, _) => format!("unsafe {{ {}.assume_init() }}", FieldName(&self.name)),
             _ => unreachable!(),
         };
 
@@ -257,46 +266,7 @@ impl Param {
 
     /// Get the generics necessary for this item.
     fn generics(&self, state: &mut State<'_>) -> Result<Option<String>> {
-        Ok(match &self.ty {
-            Type::Callback {
-                name,
-                params,
-                fn_type,
-                input_ptr_ty,
-                ret_ty,
-            } => {
-                let mut genbound = format!(
-                    "{}: {}(",
-                    AsUpperCamelCase(name),
-                    match fn_type {
-                        FnType::FnMut => "FnMut",
-                    }
-                );
-
-                for (i, param) in params
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, p)| p.ptr_class() != Some(*input_ptr_ty))
-                {
-                    let ip = param.param_position(true, state)?;
-                    genbound.push_str(&ip);
-                    if i != params.len() - 1 {
-                        genbound.push_str(", ");
-                    }
-                }
-
-                genbound.push(')');
-
-                if let Some(ret_ty) = ret_ty {
-                    let rp = ret_ty.return_position(state)?;
-                    genbound.push_str(" -> ");
-                    genbound.push_str(&rp);
-                }
-
-                Some(genbound)
-            }
-            _ => None,
-        })
+        self.ty.generics(state)
     }
 }
 
@@ -338,7 +308,7 @@ fn merge_params(
                     mergable_params
                         .rfind(|(_, param)| {
                             likely_slice_count(param.name)
-                                && matches!(param.ty, Type::Primitive("i32" | "u32"))
+                                && matches!(param.ty, Type::Primitive(ref prim) if prim == "i32" || prim == "u32")
                         })
                         .map(move |(size_index, _)| {
                             (index, param, size_index, MergeInfo::MakeSlice)
@@ -589,7 +559,7 @@ impl Function {
             {
                 swwriteln!(
                     state,
-                    "let {} = unsafe {{ mem::zeroed() }};",
+                    "let {}_win32 = unsafe {{ mem::zeroed() }};",
                     param.name
                 )?;
             }
@@ -623,9 +593,9 @@ impl Function {
             )?;
             for (i, param) in self.params.iter().enumerate() {
                 if matches!(param.variation, Variation::InOut) {
-                    swwrite!(state, "&mut {}", Sanitize(param.name))?;
+                    swwrite!(state, "&mut {}_win32", Sanitize(param.name))?;
                 } else {
-                    swwrite!(state, "{}", Sanitize(param.name))?;
+                    swwrite!(state, "{}_win32", Sanitize(param.name))?;
                 }
                 if i != self.params.len() - 1 {
                     swwrite!(state, ", ")?;
@@ -718,7 +688,7 @@ impl Function {
                         .map(|(_, p)| p.name)
                         .collect::<Vec<_>>();
                     for (i, name) in output_names.iter().enumerate() {
-                        swwrite!(state, "{}", name)?;
+                        swwrite!(state, "{}", AsSnakeCase(name))?;
                         if i != output_names.len() - 1 {
                             swwrite!(state, ", ")?;
                         }

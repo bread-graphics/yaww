@@ -1,4 +1,7 @@
-// MIT/Apache2 License
+//                  Copyright John Nunley 2022.
+// Distributed under the Boost Software License, Version 1.0.
+//         (See accompanying file LICENSE or copy at
+//           https://www.boost.org/LICENSE_1_0.txt)
 
 #![forbid(unsafe_code)]
 
@@ -201,23 +204,23 @@ impl<'s> State<'s> {
     fn get_item(&mut self, ty: &Type) -> Result<types::Type> {
         match ty {
             Type::Void => Ok(types::Type::Void),
-            Type::I8 => Ok(types::Type::Primitive("i8")),
-            Type::I16 => Ok(types::Type::Primitive("i16")),
-            Type::I32 => Ok(types::Type::Primitive("i32")),
-            Type::I64 => Ok(types::Type::Primitive("i64")),
-            Type::U8 => Ok(types::Type::Primitive("u8")),
-            Type::U16 => Ok(types::Type::Primitive("u16")),
-            Type::U32 => Ok(types::Type::Primitive("u32")),
-            Type::U64 => Ok(types::Type::Primitive("u64")),
-            Type::F32 => Ok(types::Type::Primitive("f32")),
-            Type::F64 => Ok(types::Type::Primitive("f64")),
-            Type::ISize => Ok(types::Type::Primitive("isize")),
-            Type::USize => Ok(types::Type::Primitive("usize")),
+            Type::I8 => Ok(types::Type::primitive("i8")),
+            Type::I16 => Ok(types::Type::primitive("i16")),
+            Type::I32 => Ok(types::Type::primitive("i32")),
+            Type::I64 => Ok(types::Type::primitive("i64")),
+            Type::U8 => Ok(types::Type::primitive("u8")),
+            Type::U16 => Ok(types::Type::primitive("u16")),
+            Type::U32 => Ok(types::Type::primitive("u32")),
+            Type::U64 => Ok(types::Type::primitive("u64")),
+            Type::F32 => Ok(types::Type::primitive("f32")),
+            Type::F64 => Ok(types::Type::primitive("f64")),
+            Type::ISize => Ok(types::Type::primitive("isize")),
+            Type::USize => Ok(types::Type::primitive("usize")),
             Type::String => Ok(types::Type::String),
-            Type::Bool => Ok(types::Type::Primitive("bool")),
-            Type::Char => Ok(types::Type::Primitive("u8")),
-            Type::HRESULT => Ok(types::Type::Primitive("HRESULT")),
-            Type::GUID => Ok(types::Type::Primitive("GUID")),
+            Type::Bool => Ok(types::Type::primitive("bool")),
+            Type::Char => Ok(types::Type::primitive("u8")),
+            Type::HRESULT => Ok(types::Type::primitive("HRESULT")),
+            Type::GUID => Ok(types::Type::primitive("GUID")),
             Type::IUnknown => Ok(types::Type::Item(Rc::new(Item::Interface))),
             Type::TypeDef(td) => {
                 // if this is a union, generate the anonymous types
@@ -285,16 +288,36 @@ impl<'s> State<'s> {
     fn compose_struct(&mut self, td: &TypeDef) -> Result<Item> {
         self.current_item_name = Some(Cow::Borrowed(td.name()));
 
+        let real_arr_type = self.config.real_arr_type.get(td.name()).map(|rat| {
+            anyhow::Ok((Pattern::new(&rat.fname)?, rat.real_ty.clone()))
+        }).transpose()?;
+
         let fields = td
             .fields()
             .map(|field| {
-                let field_ty = field.get_type(Some(td));
+                let mut field_ty = field.get_type(Some(td));
+
+                // if it is an array type, it might be different
+                let ty = match self.get_item(&field_ty) {
+                    Ok(mut ty) => {
+                        if let types::Type::Array(ref mut ty, ..) = ty {
+                            // check real_arr_types in state to see if there's an entry
+                            if let Some(ref arr_type) = real_arr_type { 
+                                if arr_type.0.matches(field.name()) {
+                                    // set the type
+                                    *ty = Box::new(types::Type::Primitive(Cow::Owned(arr_type.1.to_string())));
+                                }
+                            }
+                        }
+
+                        ResolveLater::resolved(ty)
+                    },
+                    Err(_) => ResolveLater::unresolved(field_ty),
+                };
+                
                 Field {
                     name: Cow::Borrowed(field.name()),
-                    ty: match self.get_item(&field_ty) {
-                        Ok(ty) => ResolveLater::resolved(ty),
-                        Err(_) => ResolveLater::unresolved(field_ty),
-                    },
+                    ty,
                 }
             })
             .collect();
