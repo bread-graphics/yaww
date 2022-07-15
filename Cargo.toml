@@ -1,2 +1,2 @@
 [workspace]
-members = ["yaww-generator", "safer-wingui", "yaww"]
+members = ["yaww-generator", "yaww"]

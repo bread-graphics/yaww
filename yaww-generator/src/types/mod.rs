@@ -1,6 +1,9 @@
-// MIT/Apache2 License
+//                Copyright John Nunley 2022
+// Distributed under the Boost Software License, Version 1.0.
+//        (See accompanying file LICENSE or copy at
+//          https://www.boost.org/LICENSE_1_0.txt)
 
-use crate::{fits_globs, swwriteln, types::ty::PtrClass, State, any_res, all_res};
+use crate::{all_res, any_res, fits_globs, swwriteln, types::ty::PtrClass, State};
 use anyhow::{anyhow, Context, Result};
 use heck::{AsSnakeCase, AsUpperCamelCase};
 use std::{
@@ -176,12 +179,25 @@ impl Param {
             make_mutable = true;
         }
 
-        let expr = ty.input_expression(&FieldName(&self.name).to_string(), self.optional, state)?;
+        let expr = ty.input_expression(
+            &FieldName(&self.name).to_string(),
+            matches!(self.variation, Variation::InOut),
+            self.optional,
+            state,
+        )?;
+
+        let explicit_type = if matches!(self.ty, Type::Callback { .. }) {
+            format!(": {}", self.ty.win32_param_position(state)?)
+        } else {
+            "".to_string()
+        };
+
         swwriteln!(
             state,
-            "let {}{}_win32 = {};",
+            "let {}{}_win32{} = {};",
             if make_mutable { "mut " } else { "" },
             Sanitize(&self.name),
+            explicit_type,
             expr,
         )?;
 
@@ -196,12 +212,21 @@ impl Param {
             Type::Slice(_) => {
                 // the first merged parameter will be our length
                 let length_name = self.merged.first().unwrap();
-                swwriteln!(
-                    state,
-                    "let {}_win32 = {}.len() as _;",
-                    Sanitize(length_name),
-                    FieldName(self.name),
-                )?;
+                if self.optional {
+                    swwriteln!(
+                        state,
+                        "let {}_win32 = {}.map_or(0, |v| v.len() as _);",
+                        Sanitize(length_name),
+                        FieldName(self.name),
+                    )?;
+                } else {
+                    swwriteln!(
+                        state,
+                        "let {}_win32 = {}.len() as _;",
+                        Sanitize(length_name),
+                        FieldName(self.name),
+                    )?;
+                }
             }
             Type::Callback {
                 fn_type,
@@ -234,7 +259,7 @@ impl Param {
                 }
 
                 if let PtrClass::Wparam | PtrClass::Lparam = input_ptr_ty {
-                    swwrite!(state, ") }}")?;
+                    swwrite!(state, ") }}.into_inner()")?;
                 }
 
                 swwriteln!(state, ";")?;
@@ -251,14 +276,18 @@ impl Param {
             (Variation::Output, ty) if ty.is_str_ref() || ty.is_os_str_ref() => {
                 FieldName(self.name).to_string()
             }
-            (Variation::Output, _) => format!("unsafe {{ {}.assume_init() }}", FieldName(&self.name)),
+            (Variation::Output, _) => {
+                format!("unsafe {{ {}.assume_init() }}", FieldName(&self.name))
+            }
             _ => unreachable!(),
         };
 
-        let expr = self
-            .ty
-            .unwrap_mut_ref()?
-            .returnable_expr(&input_expr, params, state)?;
+        let expr = self.ty.unwrap_mut_ref()?.returnable_expr(
+            &input_expr,
+            matches!(self.variation, Variation::InOut),
+            params,
+            state,
+        )?;
         swwriteln!(state, "let {} = {};", FieldName(self.name), expr,)?;
 
         Ok(())
@@ -432,9 +461,12 @@ impl Function {
             .return_type
             .as_ref()
             .map_or(Ok(false), |ret_ty| ret_ty.involves_void(state))?;
-        any_res(self.params
-            .iter()
-            .map(|p| p.involves_void(state)).chain(Some(Ok(ret_ty))))
+        any_res(
+            self.params
+                .iter()
+                .map(|p| p.involves_void(state))
+                .chain(Some(Ok(ret_ty))),
+        )
     }
 
     pub fn write(&self, state: &mut State<'_>) -> Result<()> {
@@ -592,8 +624,19 @@ impl Function {
                 self.name
             )?;
             for (i, param) in self.params.iter().enumerate() {
-                if matches!(param.variation, Variation::InOut) {
-                    swwrite!(state, "&mut {}_win32", Sanitize(param.name))?;
+                if matches!(param.variation, Variation::InOut)
+                    && !param.ty.is_str_ref()
+                    && !param.ty.is_os_str_ref()
+                {
+                    if false {
+                        swwrite!(
+                            state,
+                            "{}_win32.as_mut().map_or(ptr::null_mut(), |v| v as *mut _)",
+                            Sanitize(param.name)
+                        )?;
+                    } else {
+                        swwrite!(state, "&mut {}_win32", Sanitize(param.name))?;
+                    }
                 } else {
                     swwrite!(state, "{}_win32", Sanitize(param.name))?;
                 }
@@ -615,12 +658,8 @@ impl Function {
 
             // make returned finalize
             if let Some(ty) = self.return_type.as_ref() {
-                let rty = ty.returnable_expr("return_value", &self.params, state)?;
-                swwriteln!(
-                    state,
-                    "let real_return_value = {};",
-                    rty 
-                )?;
+                let rty = ty.returnable_expr("return_value", false, &self.params, state)?;
+                swwriteln!(state, "let real_return_value = {};", rty)?;
             }
 
             // parse returned parameters
@@ -668,6 +707,11 @@ impl Function {
                     }
                 }
                 _ => {
+                    // tell whether or not we use the return type
+                    if self.return_type.is_none() {
+                        swwriteln!(state, "let _ = return_value;")?;
+                    }
+
                     if is_fallible {
                         swwrite!(state, "Ok(")?;
                     }
@@ -749,16 +793,29 @@ impl<T: AsRef<str>> fmt::Display for Sanitize<T> {
     }
 }
 
-fn function_type(params: &[Param], ret_ty: Option<&Type>, state: &mut State<'_>) -> Result<String> {
+fn function_type_with_params(
+    params: &[Param],
+    ret_ty: Option<&Type>,
+    state: &mut State,
+) -> Result<String> {
+    let types: Vec<&Type> = params.iter().map(|p| &p.ty).collect();
+    function_type(types, ret_ty, state)
+}
+
+fn function_type<'a>(
+    params: impl IntoIterator<Item = &'a Type>,
+    ret_ty: Option<&Type>,
+    state: &mut State<'_>,
+) -> Result<String> {
     let mut expr = r#"Option<unsafe extern "system" fn("#.to_string();
 
-    for (i, param) in params.iter().enumerate() {
-        let pp = param.ty.win32_param_position(state)?;
-        expr.push_str(&pp);
-
-        if i != params.len() - 1 {
-            expr.push_str(", ");
+    for (i, param) in params.into_iter().enumerate() {
+        if i > 0 {
+            expr.push_str(",");
         }
+
+        let pp = param.win32_param_position(state)?;
+        expr.push_str(&pp);
     }
 
     expr.push(')');

@@ -1,4 +1,7 @@
-// MIT/Apache2 License
+//                Copyright John Nunley 2022
+// Distributed under the Boost Software License, Version 1.0.
+//        (See accompanying file LICENSE or copy at
+//          https://www.boost.org/LICENSE_1_0.txt)
 
 use core::{fmt, marker::PhantomData};
 
@@ -35,16 +38,16 @@ macro_rules! base_impl {
 
         pub trait $into_name {
             /// Serialize this value into the parameter.
-            /// 
+            ///
             /// # Safety
-            /// 
+            ///
             /// The end consumer must be aware of the true value of the
             /// parameter.
             unsafe fn serialize(self) -> $name;
             /// Deserialize this value from this parameter.
-            /// 
+            ///
             /// # Safety
-            /// 
+            ///
             /// The parameter must be a valid instance of this type.
             unsafe fn deserialize(val: $name) -> Self;
         }
@@ -61,7 +64,7 @@ macro_rules! base_impl {
                 }
             }
 
-            pub const unsafe fn from_ptr(ptr: *mut ()) -> Self {
+            pub unsafe fn from_ptr(ptr: *mut ()) -> Self {
                 Self::from_inner(ptr as $inner)
             }
 

@@ -1,7 +1,10 @@
-// MIT/Apache2 License
+//                Copyright John Nunley 2022
+// Distributed under the Boost Software License, Version 1.0.
+//        (See accompanying file LICENSE or copy at
+//          https://www.boost.org/LICENSE_1_0.txt)
 
 use super::{format_namespace, Constant, Field, FieldName, Param, Sanitize, Special, Type};
-use crate::{State, any_res, all_res, Derives};
+use crate::{all_res, any_res, Derives, State};
 use anyhow::{anyhow, Result};
 use heck::{
     AsLowerCamelCase, AsShoutySnakeCase, AsSnakeCase, AsUpperCamelCase, ToSnakeCase,
@@ -48,7 +51,7 @@ fn struct_varsize(fields: &[Field], state: &mut State<'_>) -> Result<bool> {
         let ty = field.ty(state)?;
         Ok(ty.involves_varsized())
     }))
-} 
+}
 
 fn struct_impl_block(
     name: &str,
@@ -59,9 +62,7 @@ fn struct_impl_block(
     state: &mut State<'_>,
 ) -> Result<()> {
     // whether or not all fields are thin
-    let mut is_thin = all_res(fields
-        .iter()
-        .map(|f| f.ty(state)?.thin(state)))?;
+    let mut is_thin = all_res(fields.iter().map(|f| f.ty(state)?.thin(state)))?;
     let is_varsize = struct_varsize(fields, state)?;
 
     // we aren't this if the last field is a size
@@ -105,6 +106,7 @@ fn struct_impl_block(
 
                     if i == 0 && (field.name.ends_with("Size")) {
                         // field needs to be set to the size of the new structure
+                        swwriteln!(state, "let _ = {};", &fname,)?;
                         swwriteln!(
                             state,
                             "let {} = mem::size_of::<{}>() as _;",
@@ -211,34 +213,56 @@ impl Item {
 
                 let is_union = *is_union;
                 // don't write if we contain an interface
-                if any_res(fields.iter().map(|f| anyhow::Ok(f.ty(state)?.is_interface())))? {
+                if any_res(
+                    fields
+                        .iter()
+                        .map(|f| anyhow::Ok(f.ty(state)?.is_interface())),
+                )? {
                     return Ok(());
                 }
 
-                let involves_void = any_res(fields
-                    .iter()
-                    .map(|f| f.involves_void(state)))?;
-                let involves_stub = any_res(fields.iter().map(|f| f.ty(state)?.involves_stub(state)))?;
+                let involves_void = any_res(fields.iter().map(|f| f.involves_void(state)))?;
+                let involves_stub =
+                    any_res(fields.iter().map(|f| f.ty(state)?.involves_stub(state)))?;
+                let involves_mut_ref = any_res(fields.iter().map(|f| {
+                    let ty = f.ty(state)?;
+                    ty.involves_mut_ref(state)
+                }))?;
+
                 if involves_void {
                     state.begin_comment();
                     swwriteln!(state, "Not generated due to containing a void type")?;
                 } else if involves_stub {
                     state.begin_comment();
                     swwriteln!(state, "Not generated because it involves stubs, crate should manually define type")?;
+                } else if involves_mut_ref {
+                    state.begin_comment();
+                    swwriteln!(state, "Not generated because it involves mut refs")?;
                 }
 
                 if !is_union {
                     // calculate and write the derives
-                    let derives = fields.iter().map(|field| {
-                        let ty = field.ty(state)?;
-                        Derives::of(ty, state)
-                    }).try_fold(Derives::default(), |acc, b| anyhow::Ok(acc * b?))?;
+                    let derives = fields
+                        .iter()
+                        .map(|field| {
+                            let ty = field.ty(state)?;
+                            Derives::of(ty, state)
+                        })
+                        .try_fold(Derives::default(), |acc, b| anyhow::Ok(acc * b?))?;
                     derives.emit(state)?;
+                }
+
+                let mut is_thin = all_res(fields.iter().map(|f| f.ty(state)?.thin(state)))?;
+                let first_field_name = &fields.first().unwrap().name;
+                if first_field_name.ends_with("size") || first_field_name.ends_with("Size") {
+                    is_thin = false;
                 }
 
                 swwrite!(state, "#[repr(C")?;
                 if let Some(packing) = packing {
-                    swwrite!(state, ", packed({})", packing)?;
+                    if is_thin {
+                        swwrite!(state, ", packed({})", packing)?;
+                    }
                 }
                 swwriteln!(state, ")]")?;
 
@@ -250,7 +274,8 @@ impl Item {
                 }
                 swwrite!(state, "{}", AsUpperCamelCase(name))?;
 
-                let needs_lifetime = any_res(fields.iter().map(|f| f.ty(state)?.needs_lifetime(state)))?;
+                let needs_lifetime =
+                    any_res(fields.iter().map(|f| f.ty(state)?.needs_lifetime(state)))?;
                 if needs_lifetime {
                     swwrite!(state, "<'a>")?;
                 }
@@ -278,7 +303,7 @@ impl Item {
                     struct_impl_block(name, fields, is_union, needs_lifetime, namespace, state)?;
                 }
 
-                if involves_void || involves_stub {
+                if involves_void || involves_stub || involves_mut_ref {
                     state.end_comment();
                 }
             }
@@ -350,26 +375,6 @@ unsafe impl breadthread::Compatible for {0} {{
     }}
 }}
                     "#,
-                    AsUpperCamelCase(name),
-                )?;
-
-                ywriteln!(
-                    state,
-                    "
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct {0} <Tag = YawwTag> {{
-    inner: Object<safer_wingui::{0}, Tag>,
-}}
-
-impl<Tag> {0}<Tag> {{
-    pub(crate) fn new(inner: Object<safer_wingui::{0}, Tag>) -> Self {{
-        Self {{
-            inner,
-        }}
-    }}
-}}
-                    ",
                     AsUpperCamelCase(name),
                 )?;
             }

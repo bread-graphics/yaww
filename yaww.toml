@@ -119,6 +119,14 @@ ignore = [
     "CREDENTIAL_*",
     "ENUMUILANG",
     "DoEnvironment*",
+    "Shell*",
+    "DrawState*",
+    "PolyTextOut*",
+    "TTRunValidationTests*",
+    "LoadUserProfile*",
+    "InsertMenuItem*",
+    "EnumResourceLanguagesEx*",
+    "*MenuItemInfo*",
 ]
 actual_bools = [
     "*_visible*",
@@ -145,7 +153,7 @@ DISPLAY_DEVICEW = { fname = "Device*", real_ty = "u16" }
 DROPDESCRIPTION = { fname = "sz*", real_ty = "u16" }
 ENUMLOGFONTW = { fname = "elf*", real_ty = "u16" }
 ENUMLOGFONTEXW = { fname = "elf*", real_ty = "u16" }
-EXTLOGFONTW = { fname = "elf*", real_ty = "u16" }
+EXTLOGFONTW = { fname = "elf_vendor_id", real_ty = "u8" }
 FILEDESCRIPTORW = { fname = "cF*", real_ty = "u16" }
 LOGFONTW = { fname = "lf*", real_ty = "u16" }
 EXP_DARWIN_LINK = { fname = "szw*", real_ty = "u16" }

@@ -1,7 +1,13 @@
-// MIT/Apache2 License
+//                Copyright John Nunley 2022
+// Distributed under the Boost Software License, Version 1.0.
+//        (See accompanying file LICENSE or copy at
+//          https://www.boost.org/LICENSE_1_0.txt)
 
-use super::{function_type, likely_slice_count, FnType, Item, Param, Special, Variation, any_res, all_res};
-use crate::{State, format_namespace};
+use super::{
+    all_res, any_res, function_type, function_type_with_params, likely_slice_count, FnType, Item,
+    Param, Special, Variation,
+};
+use crate::{format_namespace, types::FieldName, State};
 use anyhow::{anyhow, Result};
 use heck::{
     AsLowerCamelCase, AsShoutySnakeCase, AsSnakeCase, AsUpperCamelCase, ToSnakeCase,
@@ -20,7 +26,7 @@ pub enum Type {
     /// Stubbed out to be implemented in the crate body.
     Stub,
     /// A primitive type, like `u32` or `bool`.
-    Primitive(Cow<'static , str>),
+    Primitive(Cow<'static, str>),
     /// Something like a string.
     String,
     /// Something like an `OsString`.
@@ -44,7 +50,7 @@ pub enum Type {
         fn_type: FnType,
     },
     /// A variable-size value containing this inner type.
-    /// 
+    ///
     /// This is only valid in structures.
     VariableSize(Box<Type>),
 }
@@ -73,14 +79,14 @@ impl Type {
     pub fn is_function(&self) -> bool {
         match self {
             Self::Item(item) => matches!(&**item, Item::FunctionType { .. }),
-            _ => false, 
+            _ => false,
         }
     }
 
     fn any_match_in_tree<F: FnMut(&Self) -> bool>(
         &self,
         state: &mut State<'_>,
-        mut tester: F
+        mut tester: F,
     ) -> Result<bool> {
         if tester(self) {
             return Ok(true);
@@ -93,19 +99,24 @@ impl Type {
             Self::Callback { params, ret_ty, .. } => {
                 // prevent more than one level of type recursion
                 let mut dyn_tester: &mut dyn FnMut(&Self) -> bool = &mut tester;
-                let rt = ret_ty
-                    .as_ref()
-                    .map_or(Ok(false), |ret_ty| ret_ty.any_match_in_tree(state, &mut dyn_tester))?;
-                any_res(params
-                    .iter()
-                    .map(|ty| ty.any_match_in_tree(state, &mut dyn_tester)).chain(Some(Ok(rt))))
+                let rt = ret_ty.as_ref().map_or(Ok(false), |ret_ty| {
+                    ret_ty.any_match_in_tree(state, &mut dyn_tester)
+                })?;
+                any_res(
+                    params
+                        .iter()
+                        .map(|ty| ty.any_match_in_tree(state, &mut dyn_tester))
+                        .chain(Some(Ok(rt))),
+                )
             }
             Self::Item(item) => {
                 if let Item::Structure { fields, .. } = &**item {
                     let mut dyn_tester: &mut dyn FnMut(&Self) -> bool = &mut tester;
-                    any_res(fields
-                        .iter()
-                        .map(|field| field.ty(state)?.any_match_in_tree(state, &mut dyn_tester)))
+                    any_res(
+                        fields.iter().map(|field| {
+                            field.ty(state)?.any_match_in_tree(state, &mut dyn_tester)
+                        }),
+                    )
                 } else {
                     Ok(false)
                 }
@@ -120,6 +131,10 @@ impl Type {
 
     pub fn involves_void(&self, state: &mut State<'_>) -> Result<bool> {
         self.any_match_in_tree(state, |t| matches!(t, Self::Void))
+    }
+
+    pub fn involves_mut_ref(&self, state: &mut State<'_>) -> Result<bool> {
+        self.any_match_in_tree(state, |t| matches!(t, Self::MutRef(..)))
     }
 
     /// In the constant position.
@@ -137,7 +152,7 @@ impl Type {
     }
 
     pub fn generics(&self, state: &mut State<'_>) -> Result<Option<String>> {
-         Ok(match &self {
+        Ok(match &self {
             Type::Callback {
                 name,
                 params,
@@ -176,7 +191,7 @@ impl Type {
                 Some(genbound)
             }
             _ => None,
-        })       
+        })
     }
 
     pub fn unwrap_mut_ref(&self) -> Result<&Type> {
@@ -191,7 +206,9 @@ impl Type {
         Ok(match self {
             Self::Ref(_) | Self::MutRef(_) | Self::String | Self::OsString | Self::Slice(_) => true,
             Self::Item(item) => match &**item {
-                Item::Structure { fields, .. } => any_res(fields.iter().map(|f| f.ty(state)?.needs_lifetime(state)))?,
+                Item::Structure { fields, .. } => {
+                    any_res(fields.iter().map(|f| f.ty(state)?.needs_lifetime(state)))?
+                }
                 _ => false,
             },
             _ => false,
@@ -230,7 +247,7 @@ impl Type {
                     params,
                     return_type,
                     ..
-                } => function_type(params, return_type.as_ref(), state)?,
+                } => function_type_with_params(params, return_type.as_ref(), state)?,
                 Item::Special(s) => s.name().to_string(),
                 Item::Interface => return Err(anyhow!("interface invalid in field position")),
             },
@@ -266,7 +283,7 @@ impl Type {
                     params,
                     return_type,
                     ..
-                } => function_type(params, return_type.as_ref(), state)?,
+                } => function_type_with_params(params, return_type.as_ref(), state)?,
                 Item::ForeignHandle(name) => name.to_upper_camel_case(),
                 Item::Interface => return Err(anyhow!("interface invalid in param position")),
                 Item::Special(s) => s.name().to_string(),
@@ -303,8 +320,8 @@ impl Type {
             Self::String => "PSTR".to_string(),
             Self::OsString => "PWSTR".to_string(),
             Self::Slice(_) => return Err(anyhow!("invalid slice in win32 param position")),
-            Self::Callback { .. } => {
-                return Err(anyhow!("invalid callback in win32 param position"))
+            Self::Callback { params, ret_ty, .. } => {
+                function_type(params, ret_ty.as_deref(), state)?
             }
             Self::Item(item) => match &**item {
                 Item::AlreadyImported(n) | Item::ForeignHandle(n) => n.to_string(),
@@ -313,9 +330,11 @@ impl Type {
                     params,
                     return_type,
                     ..
-                } => function_type(params, return_type.as_ref(), state)?,
+                } => function_type_with_params(params, return_type.as_ref(), state)?,
                 Item::Special(s) => s.win32_name().to_string(),
-                Item::Structure { name, namespace, .. } => format!("{}::{}", format_namespace(namespace), name),
+                Item::Structure {
+                    name, namespace, ..
+                } => format!("{}::{}", format_namespace(namespace), name),
                 Item::Interface => unreachable!(),
             },
             ty => return Err(anyhow!("Invalid type in Win32 param position: {:?}", ty)),
@@ -341,7 +360,7 @@ impl Type {
                     params,
                     return_type,
                     ..
-                } => function_type(params, return_type.as_ref(), state)?,
+                } => function_type_with_params(params, return_type.as_ref(), state)?,
                 Item::Structure { name, .. } => {
                     if self.needs_lifetime(state)? {
                         format!("{}<'static>", AsUpperCamelCase(name))
@@ -395,10 +414,8 @@ impl Type {
                     let first_field_is_size =
                         first_field_name.ends_with("Size") || first_field_name.ends_with("size");
 
-                    !first_field_is_size && 
-                    all_res(fields
-                        .iter()
-                        .map(|f| {
+                    !first_field_is_size
+                        && all_res(fields.iter().map(|f| {
                             let ty = f.ty(state)?;
                             ty.thin(state)
                         }))?
@@ -415,6 +432,7 @@ impl Type {
     pub fn input_expression(
         &self,
         input_name: &str,
+        is_inout: bool,
         optional: bool,
         state: &mut State<'_>,
     ) -> Result<String> {
@@ -427,8 +445,26 @@ impl Type {
                 format!("{}.as_ptr() as _", name)
             })
         };
+        let c_string = |input_name: &str, state: &mut State<'_>| {
+            if is_inout {
+                // if we're in/out cast to a mutable buffer
+                swwriteln!(
+                    state,
+                    "let mut inout_buf: Vec<u8> = {}.to_bytes().to_vec();",
+                    input_name,
+                )?;
+
+                Ok("inout_buf.as_mut_ptr() as _".to_string())
+            } else {
+                map_to_ptr(input_name.to_string())
+            }
+        };
         let os_string = |input_name, state: &mut State<'_>| {
-            let name = tempvar();
+            let name = if is_inout {
+                "inout_buf".to_string()
+            } else {
+                tempvar()
+            };
             let mut source = input_name;
 
             if optional {
@@ -455,9 +491,13 @@ impl Type {
         };
 
         match self {
-            Self::Primitive(_) => Ok(input_name.to_string()),
-            Self::String => map_to_ptr(input_name.to_string()),
-            Self::Ref(ty) if matches!(&**ty, Self::String) => map_to_ptr(input_name.to_string()),
+            Self::Primitive(_) => Ok(if optional {
+                format!("{}.unwrap_or_else(Default::default)", input_name)
+            } else {
+                input_name.to_string()
+            }),
+            Self::String => c_string(input_name, state),
+            Self::Ref(ty) if matches!(&**ty, Self::String) => c_string(input_name, state),
             Self::Ref(ty) if matches!(&**ty, Self::OsString) => os_string(input_name, state),
             Self::Ref(ty) => {
                 // if it's a thin type, we can do a direct cast
@@ -473,17 +513,15 @@ impl Type {
                     })
                 } else {
                     let name = tempvar();
-                    let ie = ty.input_expression(input_name, optional, state)?;
+                    let ie = ty.input_expression(input_name, is_inout, optional, state)?;
                     swwriteln!(state, "let {} = {};", &name, ie)?;
 
-                    Ok(
-                        format!("&{}", name)
-                    )
+                    Ok(format!("&{}", name))
                 }
             }
             Self::MutRef(ty) => {
                 let name = tempvar();
-                let ie = ty.input_expression(input_name, optional, state)?;
+                let ie = ty.input_expression(input_name, is_inout, optional, state)?;
                 swwriteln!(state, "let mut {} = {};", &name, ie)?;
 
                 Ok(if optional {
@@ -510,7 +548,7 @@ impl Type {
                     write!(
                         expr,
                         "{}",
-                        ty.input_expression(&input_expr, optional, state)?
+                        ty.input_expression(&input_expr, is_inout, optional, state)?
                     )
                     .ok();
 
@@ -562,7 +600,13 @@ impl Type {
                 // calls it
                 let fname = format!("{}_impl", AsSnakeCase(name),);
                 let generic_name = name.to_upper_camel_case();
-                swwrite!(state, r#"unsafe extern "system" fn {}<{}>("#, &fname, &generic_name)?;
+                let generics = self.generics(state)?.unwrap();
+                swwrite!(
+                    state,
+                    r#"unsafe extern "system" fn {}<{}>("#,
+                    &fname,
+                    &generics
+                )?;
                 for (i, param) in params.iter().enumerate() {
                     let pp = param.win32_param_position(state)?;
                     swwrite!(state, "param{}: {}", i, pp)?;
@@ -599,7 +643,8 @@ impl Type {
 
                     // generate input parameters
                     for (i, param) in iter_params() {
-                        let ret_expr = param.returnable_expr(&format!("param{}", i), &[], state)?;
+                        let ret_expr =
+                            param.returnable_expr(&format!("param{}", i), false, &[], state)?;
                         swwriteln!(state, "let input{} = {};", i, ret_expr,)?;
                     }
 
@@ -647,7 +692,8 @@ impl Type {
 
                     // prepare the return value to be returned
                     if let Some(ret_ty) = ret_ty {
-                        let ret_val = ret_ty.input_expression("return_value", false, state)?;
+                        let ret_val =
+                            ret_ty.input_expression("return_value", false, false, state)?;
                         swwriteln!(state, "let real_return_value = {};", ret_val,)?;
                     }
 
@@ -672,7 +718,8 @@ impl Type {
     /// Convert this item from the Win32 version to a returnable version.
     pub fn returnable_expr(
         &self,
-        input: &str,
+        mut input: &str,
+        is_inout: bool,
         params: &[Param],
         state: &mut State<'_>,
     ) -> Result<String> {
@@ -705,7 +752,12 @@ impl Type {
 
                 for i in 0..sz {
                     let input_expr = format!("{}[{}]", input, i);
-                    write!(expr, "{}", ty.returnable_expr(&input_expr, params, state)?).ok();
+                    write!(
+                        expr,
+                        "{}",
+                        ty.returnable_expr(&input_expr, is_inout, params, state)?
+                    )
+                    .ok();
 
                     if i != sz - 1 {
                         expr.push(',');
@@ -719,7 +771,7 @@ impl Type {
             Self::String | Self::OsString => {
                 // when returning a string, figure out which output parameter
                 // represents the length
-                let target_output = params
+                let mut target_output = params
                     .iter()
                     .rev()
                     .filter(|p| matches!(p.variation, Variation::Output | Variation::InOut))
@@ -732,17 +784,24 @@ impl Type {
                     })
                     .unwrap_or("return_value");
 
+                if is_inout {
+                    input = "inout_buf";
+                }
+
                 // read the string to a buffer
-                swwriteln!(state, "{}.truncate({} as usize);", input, AsSnakeCase(target_output))?;
+                swwriteln!(
+                    state,
+                    "{}.truncate({} as usize);",
+                    input,
+                    AsSnakeCase(target_output)
+                )?;
 
                 // convert to cstring or osstring
                 match self {
-                    Self::String => {
-                        Ok(format!(
-                            "unsafe {{ CString::from_vec_unchecked({}) }}",
-                            input
-                        ))
-                    }
+                    Self::String => Ok(format!(
+                        "unsafe {{ CString::from_vec_unchecked({}) }}",
+                        input
+                    )),
                     Self::OsString => Ok(format!("OsString::from_wide(&{})", input)),
                     _ => unreachable!(),
                 }
@@ -755,7 +814,7 @@ impl Type {
                     AsUpperCamelCase(name),
                     input
                 )),
-                Item::FunctionType { .. } => Ok(format!("Some({})", input)),
+                Item::FunctionType { .. } => Ok(input.to_string()),
                 Item::Special(s) => {
                     let class_name = s.name();
 
@@ -809,22 +868,14 @@ impl Type {
                 let mut expr = "[".to_string();
                 let size = *size;
                 let needs_underef = match &**ty {
-                            Type::Primitive(_) => true,
-                            Type::Item(item) => matches!(&**item, Item::AlreadyImported(_)),
-                            _ => false,
-                        };
+                    Type::Primitive(_) => true,
+                    Type::Item(item) => matches!(&**item, Item::AlreadyImported(_)),
+                    _ => false,
+                };
 
                 for i in 0..size {
-                    let input_expr = format!(
-                        "{}{}[{}]", 
-                        if needs_underef {
-                            "&"
-                        } else {
-                            ""
-                        },
-                        fname, 
-                        i
-                    );
+                    let input_expr =
+                        format!("{}{}[{}]", if needs_underef { "&" } else { "" }, fname, i);
                     write!(expr, "{}", ty.to_win32(&input_expr, state)?).ok();
 
                     if i != size - 1 {
@@ -863,7 +914,11 @@ impl Type {
             Type::Primitive(_) => fname.to_string(),
             ty if ty.is_str_ref() => {
                 // convert from string
-                swwriteln!(state, "let {0} = unsafe {{ CStr::from_ptr({0} as *const _) }};", fname,)?;
+                swwriteln!(
+                    state,
+                    "let {0} = unsafe {{ CStr::from_ptr({0} as *const _) }};",
+                    fname,
+                )?;
                 swwriteln!(state, "let {0} = {0}.to_bytes_with_nul().to_vec();", fname,)?;
 
                 format!(
@@ -891,7 +946,10 @@ impl Type {
                     return Err(anyhow!("references to non-thin types are not supported"));
                 }
 
-                format!("Cow::Borrowed(unsafe {{ &*({} as *const _ as *const _) }})", &fname)
+                format!(
+                    "Cow::Borrowed(unsafe {{ &*({} as *const _ as *const _) }})",
+                    &fname
+                )
             }
             Type::MutRef(ty) => {
                 if !ty.thin(state)? {
@@ -932,8 +990,14 @@ impl Type {
 
                     format!("unsafe {{ {}::from_inner({}) }}", class_name, fname)
                 }
-                Item::Structure { name, namespace, .. } => {
-                    format!("unsafe {{ {}::from_win32({}) }}", AsUpperCamelCase(name), fname)
+                Item::Structure {
+                    name, namespace, ..
+                } => {
+                    format!(
+                        "unsafe {{ {}::from_win32({}) }}",
+                        AsUpperCamelCase(name),
+                        fname
+                    )
                 }
                 Item::Interface => return Err(anyhow!("interface invalid in from_win32")),
             },

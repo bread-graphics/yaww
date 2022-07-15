@@ -1,6 +1,12 @@
-// MIT/Apache2 License
+//                Copyright John Nunley 2022
+// Distributed under the Boost Software License, Version 1.0.
+//        (See accompanying file LICENSE or copy at
+//          https://www.boost.org/LICENSE_1_0.txt)
 
-use core::{fmt::{self, Write}, num::NonZeroU16};
+use core::{
+    fmt::{self, Write},
+    num::NonZeroU16,
+};
 
 /// An error that may occur during operation of the Windows API.
 pub struct Error {
@@ -29,7 +35,7 @@ mod error_buffer {
     use cstr_core::CStr;
 
     pub(crate) struct ErrorBuffer {
-        heap: Vec<u8>
+        heap: Vec<u8>,
     }
 }
 
